@@ -27,6 +27,10 @@ internal static class ProblemResults
         "appointment.slot_already_taken"
             or "appointment.patient_time_conflict"
             or "appointment.invalid_status"
+            or "appointment.offer_expired"
+            or "waitlist.invalid_status"
+            or "waitlist.duplicate_entry"
+            or "waitlist.too_many_entries"
             or "common.concurrent_modification"
             or "idempotency.request_in_progress" => StatusCodes.Status409Conflict,
 

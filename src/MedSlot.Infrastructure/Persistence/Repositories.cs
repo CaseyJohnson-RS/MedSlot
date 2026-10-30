@@ -71,4 +71,18 @@ internal sealed class AppointmentRepository(MedSlotDbContext db) : IAppointmentR
             .AsNoTracking()
             .Where(a => a.PatientId == patientId)
             .ToListAsync(cancellationToken);
+
+    public Task<bool> HasActiveOverlapAsync(PatientId patientId, TimeRange range, CancellationToken cancellationToken) =>
+        db.Appointments.AnyAsync(
+            a => a.PatientId == patientId
+                && (a.Status == AppointmentStatus.Held || a.Status == AppointmentStatus.Booked)
+                && a.Time.Start < range.End
+                && a.Time.End > range.Start,
+            cancellationToken);
+
+    public Task<Appointment?> GetNextExpiredHoldAsync(Instant now, CancellationToken cancellationToken) =>
+        db.Appointments
+            .Where(a => a.Status == AppointmentStatus.Held && a.HoldExpiresAt <= now)
+            .OrderBy(a => a.HoldExpiresAt)
+            .FirstOrDefaultAsync(cancellationToken);
 }

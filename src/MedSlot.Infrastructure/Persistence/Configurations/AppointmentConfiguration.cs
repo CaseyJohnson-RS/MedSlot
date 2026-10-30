@@ -2,6 +2,7 @@ using MedSlot.Domain.Appointments;
 using MedSlot.Domain.Doctors;
 using MedSlot.Domain.Patients;
 using MedSlot.Domain.Services;
+using MedSlot.Domain.Waitlist;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -35,6 +36,10 @@ internal sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appoin
         builder.HasOne<Doctor>().WithMany().HasForeignKey(a => a.DoctorId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Patient>().WithMany().HasForeignKey(a => a.PatientId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Service>().WithMany().HasForeignKey(a => a.ServiceId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<WaitlistEntry>().WithMany().HasForeignKey(a => a.WaitlistEntryId).OnDelete(DeleteBehavior.Restrict);
+
+        // Поиск истёкших удержаний.
+        builder.HasIndex(a => a.HoldExpiresAt).HasFilter("status = 'Held'");
 
         // Подсчёт нарушений пациента (ADR 0004).
         builder.HasIndex(a => new { a.PatientId, a.Status, a.StatusChangedAt });

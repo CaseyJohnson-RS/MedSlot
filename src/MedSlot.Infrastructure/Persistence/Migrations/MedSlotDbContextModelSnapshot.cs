@@ -102,8 +102,15 @@ namespace MedSlot.Infrastructure.Persistence.Migrations
                     b.HasIndex("DoctorId")
                         .HasDatabaseName("ix_appointments_doctor_id");
 
+                    b.HasIndex("HoldExpiresAt")
+                        .HasDatabaseName("ix_appointments_hold_expires_at")
+                        .HasFilter("status = 'Held'");
+
                     b.HasIndex("ServiceId")
                         .HasDatabaseName("ix_appointments_service_id");
+
+                    b.HasIndex("WaitlistEntryId")
+                        .HasDatabaseName("ix_appointments_waitlist_entry_id");
 
                     b.HasIndex("PatientId", "Status", "StatusChangedAt")
                         .HasDatabaseName("ix_appointments_patient_id_status_status_changed_at");
@@ -206,6 +213,77 @@ namespace MedSlot.Infrastructure.Persistence.Migrations
                         .HasName("pk_services");
 
                     b.ToTable("services", (string)null);
+                });
+
+            modelBuilder.Entity("MedSlot.Domain.Waitlist.WaitlistEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CurrentOfferId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_offer_id");
+
+                    b.Property<Guid>("DoctorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("doctor_id");
+
+                    b.Property<int>("ExpiredOffersCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("expired_offers_count");
+
+                    b.Property<LocalDate>("From")
+                        .HasColumnType("date")
+                        .HasColumnName("date_from");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<Instant>("QueuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("queued_at");
+
+                    b.Property<Guid>("ServiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<LocalDate>("To")
+                        .HasColumnType("date")
+                        .HasColumnName("date_to");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_waitlist_entries");
+
+                    b.HasIndex("ServiceId")
+                        .HasDatabaseName("ix_waitlist_entries_service_id");
+
+                    b.HasIndex("DoctorId", "Status", "QueuedAt")
+                        .HasDatabaseName("ix_waitlist_entries_doctor_id_status_queued_at");
+
+                    b.HasIndex("PatientId", "DoctorId", "ServiceId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_waitlist_entries_open")
+                        .HasFilter("status IN ('Active', 'Offered')");
+
+                    b.ToTable("waitlist_entries", (string)null);
                 });
 
             modelBuilder.Entity("MedSlot.Infrastructure.Idempotency.IdempotencyKey", b =>
@@ -353,6 +431,36 @@ namespace MedSlot.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_appointments_services_service_id");
+
+                    b.HasOne("MedSlot.Domain.Waitlist.WaitlistEntry", null)
+                        .WithMany()
+                        .HasForeignKey("WaitlistEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_appointments_waitlist_entries_waitlist_entry_id");
+                });
+
+            modelBuilder.Entity("MedSlot.Domain.Waitlist.WaitlistEntry", b =>
+                {
+                    b.HasOne("MedSlot.Domain.Doctors.Doctor", null)
+                        .WithMany()
+                        .HasForeignKey("DoctorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_waitlist_entries_doctors_doctor_id");
+
+                    b.HasOne("MedSlot.Domain.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_waitlist_entries_patients_patient_id");
+
+                    b.HasOne("MedSlot.Domain.Services.Service", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_waitlist_entries_services_service_id");
                 });
 #pragma warning restore 612, 618
         }

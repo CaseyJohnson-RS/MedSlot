@@ -32,6 +32,31 @@ internal sealed class CancelByClinicRequestValidator : AbstractValidator<CancelB
             .WithMessage("Код причины: латиница в нижнем регистре, цифры и подчёркивания, например doctor_sick.");
 }
 
+internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitlistRequest>
+{
+    // Не дальше горизонта записи (60 дней).
+    private const int MaxDays = 60;
+
+    public JoinWaitlistRequestValidator()
+    {
+        RuleFor(r => r.PatientId).NotEmpty();
+        RuleFor(r => r.DoctorId).NotEmpty();
+        RuleFor(r => r.ServiceId).NotEmpty();
+        RuleFor(r => r.To)
+            .GreaterThanOrEqualTo(r => r.From)
+            .WithMessage("Дата окончания не может быть раньше даты начала.");
+        RuleFor(r => r)
+            .Must(r => r.To.DayNumber - r.From.DayNumber < MaxDays)
+            .WithName("To")
+            .WithMessage($"Диапазон не длиннее {MaxDays} дней.");
+    }
+}
+
+internal sealed class WaitlistActionRequestValidator : AbstractValidator<WaitlistActionRequest>
+{
+    public WaitlistActionRequestValidator() => RuleFor(r => r.PatientId).NotEmpty();
+}
+
 /// <summary>Параметры запроса свободных слотов.</summary>
 /// <param name="DoctorId">Врач (из пути).</param>
 /// <param name="ServiceId">Услуга: её длительность определяет длину слота.</param>

@@ -9,6 +9,7 @@ using MedSlot.Infrastructure;
 using MedSlot.Infrastructure.Idempotency;
 using MedSlot.Infrastructure.Outbox;
 using MedSlot.Infrastructure.Persistence;
+using MedSlot.Infrastructure.Waitlist;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 
@@ -34,6 +35,10 @@ builder.Services.AddMedSlotRateLimiting(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, kafka, outbox);
 builder.Services.AddHostedService<IdempotencyCleanupService>();
+if (builder.Configuration.GetValue("Waitlist:ExpiryEnabled", true))
+{
+    builder.Services.AddHostedService<WaitlistExpiryService>();
+}
 
 var app = builder.Build();
 
@@ -58,6 +63,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check 
 
 app.MapAppointmentEndpoints();
 app.MapSchedulingEndpoints();
+app.MapWaitlistEndpoints();
 
 await app.RunAsync();
 

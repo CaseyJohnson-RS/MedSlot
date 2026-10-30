@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IServiceRepository, ServiceRepository>();
         services.AddScoped<IPatientRepository, PatientRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+        services.AddScoped<IWaitlistRepository, WaitlistRepository>();
 
         services.AddScoped<IdempotencyStore>();
         services.AddScoped<IIdempotencyStore>(sp => sp.GetRequiredService<IdempotencyStore>());
