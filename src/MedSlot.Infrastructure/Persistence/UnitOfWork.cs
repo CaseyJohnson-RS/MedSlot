@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using MedSlot.Application.Abstractions;
 using MedSlot.Domain.Appointments;
 using MedSlot.Domain.Common;
+using MedSlot.Domain.Identity;
 using MedSlot.Infrastructure.Idempotency;
 using MedSlot.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
@@ -52,6 +53,15 @@ internal sealed class UnitOfWork(MedSlotDbContext db) : IUnitOfWork
         {
             // Параллельный запрос с тем же ключом идемпотентности успел сохранить его первым.
             return ApplicationErrors.IdempotencyKeyInUse;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: UserAccountConfiguration.EmailIndex,
+        })
+        {
+            // Две одновременные регистрации с одним email: проверка в обработчике прошла у обеих.
+            return IdentityErrors.EmailTaken;
         }
     }
 

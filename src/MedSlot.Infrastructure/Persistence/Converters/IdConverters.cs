@@ -1,4 +1,5 @@
 using MedSlot.Domain.Common;
+using MedSlot.Domain.Identity;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace MedSlot.Infrastructure.Persistence.Converters;
@@ -14,3 +15,8 @@ internal sealed class AppointmentIdConverter()
 
 internal sealed class WaitlistEntryIdConverter()
     : ValueConverter<WaitlistEntryId, Guid>(id => id.Value, value => new WaitlistEntryId(value));
+
+internal sealed class UserIdConverter() : ValueConverter<UserId, Guid>(id => id.Value, value => new UserId(value));
+
+internal sealed class RefreshTokenIdConverter()
+    : ValueConverter<RefreshTokenId, Guid>(id => id.Value, value => new RefreshTokenId(value));

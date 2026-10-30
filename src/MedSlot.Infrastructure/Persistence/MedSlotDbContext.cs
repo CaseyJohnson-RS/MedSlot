@@ -1,6 +1,7 @@
 using MedSlot.Domain.Appointments;
 using MedSlot.Domain.Common;
 using MedSlot.Domain.Doctors;
+using MedSlot.Domain.Identity;
 using MedSlot.Domain.Patients;
 using MedSlot.Domain.Services;
 using MedSlot.Domain.Waitlist;
@@ -21,6 +22,10 @@ public sealed class MedSlotDbContext(DbContextOptions<MedSlotDbContext> options)
 
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
 
+    public DbSet<UserAccount> Users => Set<UserAccount>();
+
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("btree_gist");
@@ -34,5 +39,7 @@ public sealed class MedSlotDbContext(DbContextOptions<MedSlotDbContext> options)
         configurationBuilder.Properties<ServiceId>().HaveConversion<ServiceIdConverter>();
         configurationBuilder.Properties<AppointmentId>().HaveConversion<AppointmentIdConverter>();
         configurationBuilder.Properties<WaitlistEntryId>().HaveConversion<WaitlistEntryIdConverter>();
+        configurationBuilder.Properties<UserId>().HaveConversion<UserIdConverter>();
+        configurationBuilder.Properties<RefreshTokenId>().HaveConversion<RefreshTokenIdConverter>();
     }
 }
