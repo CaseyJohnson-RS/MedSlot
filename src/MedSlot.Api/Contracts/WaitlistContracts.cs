@@ -3,11 +3,8 @@ using MedSlot.Domain.Waitlist;
 
 namespace MedSlot.Api.Contracts;
 
-/// <summary>Встать в лист ожидания: даты по календарю клиники, включительно.</summary>
-public sealed record JoinWaitlistRequest(Guid PatientId, Guid DoctorId, Guid ServiceId, DateOnly From, DateOnly To);
-
-/// <summary>Действие пациента над своей заявкой или предложением. До аутентификации пациент передаётся явно.</summary>
-public sealed record WaitlistActionRequest(Guid PatientId);
+/// <summary>Встать в лист ожидания: даты по календарю клиники, включительно. Пациент — из токена.</summary>
+public sealed record JoinWaitlistRequest(Guid DoctorId, Guid ServiceId, DateOnly From, DateOnly To);
 
 public sealed record WaitlistEntryCreatedResponse(Guid Id);
 

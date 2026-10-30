@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using MedSlot.Application.Abstractions;
 using MedSlot.Domain.Clinic;
 using MedSlot.Domain.Common;
 using MedSlot.Domain.Doctors;
+using MedSlot.Domain.Identity;
 using MedSlot.Domain.Patients;
 using MedSlot.Domain.Services;
 using MedSlot.Infrastructure.Outbox;
@@ -34,6 +36,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18.6-alpine").Build();
     private readonly KafkaContainer _kafka = new KafkaBuilder("apache/kafka:4.3.2").Build();
+
+    // Учётная запись создаётся один раз на субъекта, даже при параллельных запросах из теста.
+    private readonly ConcurrentDictionary<string, Lazy<Task<UserAccount>>> _accounts = new();
 
     private MedSlotApiFactory? _factory;
 
@@ -127,6 +132,32 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
         return new TestClinic(doctor.Id, long30.Id, short15.Id, patientList.Select(p => p.Id).ToList());
     }
+
+    /// <summary>Access-токен пациента без входа по паролю: учётная запись создаётся при первом обращении.</summary>
+    public Task<string> AccessTokenAsync(PatientId patient) =>
+        TokenAsync($"patient:{patient}", now => UserAccount.ForPatient(UserId.New(), TestEmail(), "test-only", patient, now));
+
+    public Task<string> DoctorTokenAsync(DoctorId doctor) =>
+        TokenAsync($"doctor:{doctor}", now => UserAccount.ForStaff(UserId.New(), TestEmail(), "test-only", UserRole.Doctor, doctor, now).Value);
+
+    public Task<string> AdminTokenAsync() =>
+        TokenAsync("admin", now => UserAccount.ForStaff(UserId.New(), TestEmail(), "test-only", UserRole.Admin, null, now).Value);
+
+    private async Task<string> TokenAsync(string subject, Func<Instant, UserAccount> create)
+    {
+        var account = await _accounts.GetOrAdd(subject, _ => new Lazy<Task<UserAccount>>(() => WithDbAsync(async db =>
+        {
+            var created = create(Clock.GetCurrentInstant());
+            db.Users.Add(created);
+            await db.SaveChangesAsync();
+            return created;
+        }))).Value;
+
+        // Токен — на текущее время часов теста: тесты сдвигают время.
+        return Factory.Services.GetRequiredService<ITokenService>().CreateAccessToken(account, Clock.GetCurrentInstant()).Token;
+    }
+
+    private static Email TestEmail() => Email.Create($"{Guid.NewGuid():N}@test.local").Value;
 
     private static async Task<Result<TResponse>> InvokeAsync<TResponse>(object handler, object request)
     {

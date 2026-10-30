@@ -10,16 +10,10 @@ internal sealed class BookAppointmentRequestValidator : AbstractValidator<BookAp
 {
     public BookAppointmentRequestValidator()
     {
-        RuleFor(r => r.PatientId).NotEmpty();
         RuleFor(r => r.DoctorId).NotEmpty();
         RuleFor(r => r.ServiceId).NotEmpty();
         RuleFor(r => r.StartsAt).NotEmpty().WithMessage("Укажите время начала приёма.");
     }
-}
-
-internal sealed class CancelByPatientRequestValidator : AbstractValidator<CancelByPatientRequest>
-{
-    public CancelByPatientRequestValidator() => RuleFor(r => r.PatientId).NotEmpty();
 }
 
 internal sealed class CancelByClinicRequestValidator : AbstractValidator<CancelByClinicRequest>
@@ -69,7 +63,6 @@ internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitl
 
     public JoinWaitlistRequestValidator()
     {
-        RuleFor(r => r.PatientId).NotEmpty();
         RuleFor(r => r.DoctorId).NotEmpty();
         RuleFor(r => r.ServiceId).NotEmpty();
         RuleFor(r => r.To)
@@ -80,11 +73,6 @@ internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitl
             .WithName("To")
             .WithMessage($"Диапазон не длиннее {MaxDays} дней.");
     }
-}
-
-internal sealed class WaitlistActionRequestValidator : AbstractValidator<WaitlistActionRequest>
-{
-    public WaitlistActionRequestValidator() => RuleFor(r => r.PatientId).NotEmpty();
 }
 
 /// <summary>Параметры запроса свободных слотов.</summary>
