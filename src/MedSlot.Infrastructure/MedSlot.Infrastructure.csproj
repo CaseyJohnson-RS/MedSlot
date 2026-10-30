@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Confluent.Kafka" />
     <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
@@ -12,6 +13,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MedSlot.Application\MedSlot.Application.csproj" />
+    <ProjectReference Include="..\MedSlot.Contracts\MedSlot.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Тесты запускают итерации relay вручную и подменяют публикацию. -->
+    <InternalsVisibleTo Include="MedSlot.Integration.Tests" />
   </ItemGroup>
 
 </Project>

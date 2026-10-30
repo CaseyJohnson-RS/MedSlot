@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/MedSlot.Api/MedSlot.Api.csproj" />
     <Project Path="src/MedSlot.Application/MedSlot.Application.csproj" />
+    <Project Path="src/MedSlot.Contracts/MedSlot.Contracts.csproj" />
     <Project Path="src/MedSlot.Domain/MedSlot.Domain.csproj" />
     <Project Path="src/MedSlot.Infrastructure/MedSlot.Infrastructure.csproj" />
     <Project Path="src/MedSlot.Workers.Analytics/MedSlot.Workers.Analytics.csproj" />

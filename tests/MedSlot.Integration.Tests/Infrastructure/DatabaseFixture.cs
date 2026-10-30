@@ -4,20 +4,24 @@ using MedSlot.Domain.Common;
 using MedSlot.Domain.Doctors;
 using MedSlot.Domain.Patients;
 using MedSlot.Domain.Services;
+using MedSlot.Infrastructure.Outbox;
 using MedSlot.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime.Testing;
+using Testcontainers.Kafka;
 using Testcontainers.PostgreSql;
 
 [assembly: AssemblyFixture(typeof(MedSlot.Integration.Tests.Infrastructure.DatabaseFixture))]
 
-
 namespace MedSlot.Integration.Tests.Infrastructure;
 
-/// <summary>Один Postgres в контейнере и одно приложение на все интеграционные тесты.</summary>
+/// <summary>
+/// Один Postgres, одна Kafka в контейнерах и одно приложение на все интеграционные тесты.
+/// Outbox relay в приложении выключен: тесты запускают его итерации сами.
+/// </summary>
 public sealed class DatabaseFixture : IAsyncLifetime
 {
     public static readonly DateTimeZone Moscow = DateTimeZoneProviders.Tzdb["Europe/Moscow"];
@@ -29,8 +33,11 @@ public sealed class DatabaseFixture : IAsyncLifetime
     public static readonly LocalDate NextMonday = new(2026, 11, 9);
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18.6-alpine").Build();
+    private readonly KafkaContainer _kafka = new KafkaBuilder("apache/kafka:4.3.2").Build();
 
     private MedSlotApiFactory? _factory;
+
+    public string KafkaBootstrapServers => _kafka.GetBootstrapAddress();
 
     public FakeClock Clock { get; } = new(BaseNow);
 
@@ -43,9 +50,10 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        await _postgres.StartAsync();
-        _factory = new MedSlotApiFactory(_postgres.GetConnectionString(), Clock);
+        await Task.WhenAll(_postgres.StartAsync(), _kafka.StartAsync());
+        _factory = new MedSlotApiFactory(_postgres.GetConnectionString(), KafkaBootstrapServers, Clock);
         await _factory.Services.InitializeDatabaseAsync(seedDemoData: false);
+        await _factory.Services.InitializeKafkaTopicsAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -55,7 +63,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
             await _factory.DisposeAsync();
         }
 
-        await _postgres.DisposeAsync();
+        await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _kafka.DisposeAsync().AsTask());
     }
 
     /// <summary>Выполняет команду в отдельном DI-scope — как отдельный HTTP-запрос.</summary>
@@ -119,13 +127,16 @@ public sealed class DatabaseFixture : IAsyncLifetime
         return await (Task<Result<TResponse>>)handle.Invoke(handler, [request, CancellationToken.None])!;
     }
 
-    private sealed class MedSlotApiFactory(string connectionString, IClock clock) : WebApplicationFactory<Program>
+    private sealed class MedSlotApiFactory(string connectionString, string kafkaBootstrapServers, IClock clock)
+        : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            // Не Development: миграции применяет фикстура, демо-данные не нужны.
+            // Не Development: миграции и топики создаёт фикстура, демо-данные не нужны.
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:Postgres", connectionString);
+            builder.UseSetting("Kafka:BootstrapServers", kafkaBootstrapServers);
+            builder.UseSetting("Outbox:RelayEnabled", "false");
 
             // Все запросы тестов идут с одного «адреса»: лимит не должен им мешать.
             // Сам лимит проверяется на производной фабрике с низким порогом.

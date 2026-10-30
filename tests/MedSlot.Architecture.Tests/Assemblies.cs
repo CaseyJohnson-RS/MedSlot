@@ -8,6 +8,7 @@ internal static class Assemblies
     public static readonly Assembly Application = MedSlot.Application.AssemblyReference.Assembly;
     public static readonly Assembly Infrastructure = MedSlot.Infrastructure.AssemblyReference.Assembly;
     public static readonly Assembly Api = typeof(Program).Assembly;
+    public static readonly Assembly Contracts = typeof(MedSlot.Contracts.EventEnvelope).Assembly;
 
     public static readonly Assembly[] Workers =
     [
@@ -24,6 +25,7 @@ internal static class Namespaces
     public const string Infrastructure = "MedSlot.Infrastructure";
     public const string Api = "MedSlot.Api";
     public const string Workers = "MedSlot.Workers";
+    public const string Contracts = "MedSlot.Contracts";
 
     public const string AspNetCore = "Microsoft.AspNetCore";
     public const string EntityFrameworkCore = "Microsoft.EntityFrameworkCore";

@@ -202,7 +202,7 @@ stateDiagram-v2
 
 Топик `appointments`, ключ сообщения — `doctorId`. В событиях **только идентификаторы и время**, без персональных данных.
 
-Общий конверт: `eventId`, `eventType`, `schemaVersion`, `occurredAt`, `doctorId`, `traceparent`, `payload`.
+Общий конверт: `eventId`, `eventType`, `schemaVersion`, `occurredAt`, `aggregateId`, `doctorId`, `traceparent`, `payload`. Схемы — в проекте `MedSlot.Contracts` (ADR 0008).
 
 | Событие | Payload |
 |---|---|
