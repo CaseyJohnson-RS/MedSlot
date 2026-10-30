@@ -16,6 +16,8 @@ internal static class Assemblies
         MedSlot.Workers.Analytics.AssemblyReference.Assembly,
         MedSlot.Workers.Audit.AssemblyReference.Assembly,
     ];
+
+    public static readonly Assembly WorkersCommon = typeof(MedSlot.Workers.Common.Consuming.EventConsumerService<>).Assembly;
 }
 
 internal static class Namespaces

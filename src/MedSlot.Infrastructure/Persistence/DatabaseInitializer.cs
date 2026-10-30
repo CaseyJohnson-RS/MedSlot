@@ -73,8 +73,9 @@ public static class DemoData
             db.Doctors.Add(doctor);
         }
 
+        // У Алисы есть email — уведомления придут письмом (Mailpit); у Бориса нет — сработает заглушка SMS.
         db.Patients.AddRange(
-            Patient.Create(Alice, "Алиса Тестова", PhoneNumber.Create("+7 900 000-00-01").Value, null).Value,
+            Patient.Create(Alice, "Алиса Тестова", PhoneNumber.Create("+7 900 000-00-01").Value, Email.Create("alice@example.com").Value).Value,
             Patient.Create(Bob, "Борис Тестов", PhoneNumber.Create("+7 900 000-00-02").Value, null).Value);
     }
 }

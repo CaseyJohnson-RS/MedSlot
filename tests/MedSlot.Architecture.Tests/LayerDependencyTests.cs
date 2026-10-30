@@ -85,4 +85,20 @@ public class LayerDependencyTests
             result.ShouldBeSuccessful(ownNamespace);
         }
     }
+
+    [Fact]
+    public void Workers_talk_to_the_core_only_through_contracts()
+    {
+        // Воркеры — отдельные сервисы: они знают только интеграционные события, но не домен,
+        // прикладной слой и хранилище основного сервиса. Иначе изменение домена ломало бы их сборку.
+        foreach (var worker in Assemblies.Workers.Append(Assemblies.WorkersCommon))
+        {
+            var result = Types.InAssembly(worker)
+                .ShouldNot()
+                .HaveDependencyOnAny(Namespaces.Domain, Namespaces.Application, Namespaces.Infrastructure, Namespaces.Api)
+                .GetResult();
+
+            result.ShouldBeSuccessful(worker.GetName().Name);
+        }
+    }
 }

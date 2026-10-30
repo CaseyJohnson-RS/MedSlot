@@ -10,6 +10,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MedSlot.Api\MedSlot.Api.csproj" />
     <ProjectReference Include="..\..\src\MedSlot.Infrastructure\MedSlot.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MedSlot.Workers.Audit\MedSlot.Workers.Audit.csproj" />
+    <ProjectReference Include="..\..\src\MedSlot.Workers.Notifications\MedSlot.Workers.Notifications.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -39,6 +39,13 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
     public string KafkaBootstrapServers => _kafka.GetBootstrapAddress();
 
+    /// <summary>Основная БД (та, что у API).</summary>
+    public string ClinicConnectionString => _postgres.GetConnectionString();
+
+    /// <summary>Отдельная база на том же сервере — для воркеров.</summary>
+    public string DatabaseConnectionString(string database) =>
+        new Npgsql.NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { Database = database }.ConnectionString;
+
     public FakeClock Clock { get; } = new(BaseNow);
 
     public ClinicPolicy Policy { get; } = ClinicPolicy.Default;
