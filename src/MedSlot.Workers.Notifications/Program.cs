@@ -8,8 +8,10 @@ var settings = new NotificationsSettings
 {
     ConnectionString = config.GetConnectionString("Notifications")
         ?? throw new InvalidOperationException("Не задана строка подключения ConnectionStrings:Notifications."),
-    ClinicConnectionString = config.GetConnectionString("Clinic")
-        ?? throw new InvalidOperationException("Не задана строка подключения ConnectionStrings:Clinic."),
+    ClinicApiBaseUrl = new Uri(config["ClinicApi:BaseUrl"]
+        ?? throw new InvalidOperationException("Не задан адрес API клиники: ClinicApi:BaseUrl.")),
+    ClinicApiServiceKey = config["ClinicApi:ServiceKey"]
+        ?? throw new InvalidOperationException("Не задан ключ сервиса: ClinicApi:ServiceKey."),
     SmtpHost = config["Smtp:Host"] ?? "localhost",
     SmtpPort = config.GetValue("Smtp:Port", 1025),
 };

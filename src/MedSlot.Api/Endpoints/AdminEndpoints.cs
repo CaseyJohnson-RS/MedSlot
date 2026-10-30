@@ -11,6 +11,7 @@ using MedSlot.Domain.Appointments;
 using MedSlot.Domain.Common;
 using MedSlot.Domain.Identity;
 using NodaTime;
+using NodaTime.Extensions;
 
 namespace MedSlot.Api.Endpoints;
 
@@ -40,6 +41,17 @@ internal static class AdminEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        admin.MapPut("/doctors/{doctorId:guid}/schedule", ChangeSchedule)
+            .WithName("ChangeWeeklySchedule")
+            .WithSummary("Заменить недельное расписание врача")
+            .WithDescription(
+                "Дни, которых нет в списке, становятся нерабочими. Исключения из расписания сохраняются. Если активные " +
+                "записи в горизонте записи окажутся вне нового рабочего времени — 409: сначала отмените их.")
+            .Validate<WeeklyScheduleRequest>()
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         admin.MapPost("/doctors/{doctorId:guid}/schedule-overrides", AddOverride)
             .WithName("AddScheduleOverride")
@@ -88,6 +100,19 @@ internal static class AdminEndpoints
                 request.Email, request.Password, request.Role, request.DoctorId is { } id ? new DoctorId(id) : null),
             ct))
             .ToResponse(id => TypedResults.Created((string?)null, new StaffCreatedResponse(id.Value)));
+
+    private static async Task<IResult> ChangeSchedule(
+        Guid doctorId, WeeklyScheduleRequest request, ICommandHandler<ChangeWeeklySchedule, Unit> handler, CancellationToken ct) =>
+        (await handler.Handle(
+            new ChangeWeeklySchedule(
+                new DoctorId(doctorId),
+                request.Days.ToDictionary(
+                    d => d.Day.ToIsoDayOfWeek(),
+                    d => (IReadOnlyList<LocalTimeRange>)d.Hours
+                        .Select(h => new LocalTimeRange(LocalTime.FromTimeOnly(h.From), LocalTime.FromTimeOnly(h.To)))
+                        .ToList())),
+            ct))
+            .ToResponse(_ => TypedResults.NoContent());
 
     private static async Task<IResult> AddOverride(
         Guid doctorId, ScheduleOverrideRequest request, ICommandHandler<AddScheduleOverride, Unit> handler, CancellationToken ct) =>

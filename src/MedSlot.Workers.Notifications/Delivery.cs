@@ -1,9 +1,10 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Http.Json;
 using System.Net.Mail;
 using Microsoft.Extensions.Logging;
 using NodaTime;
 using NodaTime.Text;
-using Npgsql;
 
 namespace MedSlot.Workers.Notifications;
 
@@ -16,24 +17,29 @@ public interface IPatientDirectory
 }
 
 /// <summary>
-/// Читает контакты из таблицы <c>patients</c> основной БД (read-only).
-/// Компромисс до аутентификации сервисов (фаза 7): затем — внутренний API с сервисным токеном (ADR 0010).
+/// Контакты из внутреннего API клиники по ключу сервиса (ADR 0012). Каждое обращение API записывает
+/// в журнал доступа к карточке; схему БД клиники воркер не знает.
 /// </summary>
-internal sealed class ClinicPatientDirectory(NpgsqlDataSource clinicDatabase) : IPatientDirectory
+internal sealed class ApiPatientDirectory(HttpClient http) : IPatientDirectory
 {
+    public const string ServiceKeyHeader = "X-Service-Key";
+
     public async Task<PatientContacts?> FindAsync(Guid patientId, CancellationToken cancellationToken)
     {
-        await using var command = clinicDatabase.CreateCommand("SELECT full_name, phone, email FROM patients WHERE id = $1");
-        command.Parameters.Add(new NpgsqlParameter { Value = patientId });
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        using var response = await http.GetAsync(
+            new Uri($"internal/v1/patients/{patientId}/contacts?purpose=notification", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
 
-        return new PatientContacts(reader.GetString(0), reader.GetString(1), await reader.IsDBNullAsync(2, cancellationToken) ? null : reader.GetString(2));
+        response.EnsureSuccessStatusCode();
+        var contacts = await response.Content.ReadFromJsonAsync<ContactsResponse>(cancellationToken)
+            ?? throw new InvalidOperationException("Пустой ответ внутреннего API контактов.");
+        return new PatientContacts(contacts.FullName, contacts.Phone, contacts.Email);
     }
+
+    private sealed record ContactsResponse(string FullName, string Phone, string? Email);
 }
 
 public sealed record NotificationMessage(Guid NotificationId, Guid PatientId, string Subject, string Body);

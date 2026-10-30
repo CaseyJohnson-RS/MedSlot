@@ -26,8 +26,9 @@ services:
         WORKER: Notifications
     environment:
       ConnectionStrings__Notifications: Host=postgres;Port=5432;Database=medslot_notifications;Username=medslot;Password=medslot
-      # Только чтение контактов пациента (ADR 0010).
-      ConnectionStrings__Clinic: Host=postgres;Port=5432;Database=medslot;Username=medslot;Password=medslot
+      # Контакты пациента — через внутренний API клиники по ключу сервиса (ADR 0012).
+      ClinicApi__BaseUrl: http://api:8080/
+      ClinicApi__ServiceKey: dev-only-notifications-service-key
       Kafka__BootstrapServers: kafka:29092
       Smtp__Host: mailpit
       Smtp__Port: 1025

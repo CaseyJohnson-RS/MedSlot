@@ -1,6 +1,11 @@
+using System.Globalization;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Confluent.Kafka;
+using MedSlot.Api.Contracts;
 using MedSlot.Application.Appointments;
 using MedSlot.Contracts;
 using MedSlot.Domain.Appointments;
@@ -41,13 +46,16 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
             new NotificationsSettings
             {
                 ConnectionString = fixture.DatabaseConnectionString("medslot_notifications_tests"),
-                ClinicConnectionString = fixture.ClinicConnectionString,
+                ClinicApiBaseUrl = new Uri("http://localhost/"),
+                ClinicApiServiceKey = DatabaseFixture.NotificationsServiceKey,
 
                 // Маленькая пачка: очередь в общей БД всегда больше неё, и обработка «до пустой очереди»
                 // проверяется в каждом прогоне, а не только при неудачном порядке тестов.
                 DispatchBatchSize = 5,
             },
-            Consumer(NotificationsWorker.ConsumerName, group)));
+            Consumer(NotificationsWorker.ConsumerName, group),
+            // Запросы к API клиники уходят в тестовый сервер в памяти, без сети.
+            clinicApi => clinicApi.ConfigurePrimaryHttpMessageHandler(() => fixture.Factory.Server.CreateHandler())));
         _audit = Build(services => services.AddAuditWorker(
             fixture.DatabaseConnectionString("medslot_audit_tests"),
             Consumer(AuditWorker.ConsumerName, group)));
@@ -65,7 +73,10 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
     private ServiceProvider Build(Action<IServiceCollection> addWorker)
     {
         var services = new ServiceCollection();
-        services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
+        services.AddLogging(b => b
+            .SetMinimumLevel(LogLevel.Warning)
+            .AddProvider(fixture.Logs)
+            .AddFilter<CapturedLogs>(null, LogLevel.Debug));
         services.AddSingleton<NodaTime.IClock>(fixture.Clock);
         addWorker(services);
         services.AddSingleton<INotificationSender>(_sender);
@@ -292,6 +303,55 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
         _sender.Sent.ShouldContain(m => m.Message.PatientId == clinic.Patient.Value && m.Message.Subject == "Напоминание о приёме");
 
         (await NotificationsFor(appointment)).ShouldAllBe(n => n.Status == NotificationStatus.Sent && n.SentAt != null);
+    }
+
+    [Fact]
+    public async Task Personal_data_does_not_reach_logs()
+    {
+        // Уникальные значения: логи общие для всех тестов, искать можно только своё.
+        var unique = Random.Shared.NextInt64(1_000_000_000, 9_999_999_999);
+        var fullName = $"Логов Тест {unique}";
+        var phone = $"+7{unique}";
+        var email = $"pii-{unique}@test.local";
+        var password = $"Secret-{unique}!";
+        var clinic = await fixture.CreateClinicAsync();
+        using var client = fixture.Factory.CreateClient();
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
+        (await client.PostAsJsonAsync("/api/v1/auth/register", new RegisterRequest(fullName, phone, email, password), Ct)).EnsureSuccessStatusCode();
+        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(email, password), Ct);
+        var tokens = (await login.EnsureSuccessStatusCode().Content.ReadFromJsonAsync<TokensResponse>(json, Ct))!;
+
+        using var card = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me/card");
+        card.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var patientId = (await (await client.SendAsync(card, Ct)).EnsureSuccessStatusCode().Content
+            .ReadFromJsonAsync<PatientCardResponse>(json, Ct))!.PatientId;
+
+        using var book = new HttpRequestMessage(HttpMethod.Post, "/api/v1/appointments")
+        {
+            Content = JsonContent.Create(new BookAppointmentRequest(clinic.Doctor.Value, clinic.Long30.Value, Msk(NextMonday, 10).ToDateTimeOffset())),
+        };
+        book.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        book.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        var appointment = (await (await client.SendAsync(book, Ct)).EnsureSuccessStatusCode().Content
+            .ReadFromJsonAsync<AppointmentCreatedResponse>(json, Ct))!.Id;
+
+        using var adminCard = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/patients/{patientId}/card?purpose=звонок пациенту");
+        adminCard.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await fixture.AdminTokenAsync());
+        (await client.SendAsync(adminCard, Ct)).EnsureSuccessStatusCode();
+
+        // Уведомление: воркер берёт контакты из внутреннего API и отправляет письмо.
+        await NotificationsConsumer.ProcessAsync(Message(Booked(appointment, patientId, Msk(NextMonday, 10), clinic.Doctor.Value)), Ct);
+        await DispatchAllDueAsync();
+        _sender.Sent.ShouldContain(m => m.Message.PatientId == patientId && m.Recipient.Email == email);
+
+        // Контроль перехвата: сценарий в логах есть, его персональных данных — нет.
+        var logs = fixture.Logs.Entries.ToList();
+        logs.ShouldContain(e => e.Contains(nameof(MedSlot.Application.Patients.ViewPatientCard), StringComparison.Ordinal));
+        foreach (var secret in new[] { fullName, unique.ToString(CultureInfo.InvariantCulture), email, password })
+        {
+            logs.ShouldNotContain(e => e.Contains(secret, StringComparison.OrdinalIgnoreCase), $"В логах найдено «{secret}»");
+        }
     }
 
     [Fact]

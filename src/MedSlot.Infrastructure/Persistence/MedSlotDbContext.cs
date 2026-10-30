@@ -26,6 +26,8 @@ public sealed class MedSlotDbContext(DbContextOptions<MedSlotDbContext> options)
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<PatientCardAccess> PatientCardAccess => Set<PatientCardAccess>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("btree_gist");
@@ -41,5 +43,6 @@ public sealed class MedSlotDbContext(DbContextOptions<MedSlotDbContext> options)
         configurationBuilder.Properties<WaitlistEntryId>().HaveConversion<WaitlistEntryIdConverter>();
         configurationBuilder.Properties<UserId>().HaveConversion<UserIdConverter>();
         configurationBuilder.Properties<RefreshTokenId>().HaveConversion<RefreshTokenIdConverter>();
+        configurationBuilder.Properties<CardAccessId>().HaveConversion<CardAccessIdConverter>();
     }
 }

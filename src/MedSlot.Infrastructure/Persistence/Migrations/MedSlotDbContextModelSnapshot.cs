@@ -306,6 +306,57 @@ namespace MedSlot.Infrastructure.Persistence.Migrations
                     b.ToTable("patients", (string)null);
                 });
 
+            modelBuilder.Entity("MedSlot.Domain.Patients.PatientCardAccess", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Instant>("AccessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accessed_at");
+
+                    b.Property<string>("AccessorKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("accessor_kind");
+
+                    b.Property<Guid?>("AccessorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("accessor_user_id");
+
+                    b.Property<Guid?>("DoctorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("doctor_id");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("ServiceName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("service_name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_patient_card_access");
+
+                    b.HasIndex("DoctorId")
+                        .HasDatabaseName("ix_patient_card_access_doctor_id");
+
+                    b.HasIndex("PatientId", "AccessedAt")
+                        .HasDatabaseName("ix_patient_card_access_patient_id_accessed_at");
+
+                    b.ToTable("patient_card_access", (string)null);
+                });
+
             modelBuilder.Entity("MedSlot.Domain.Services.Service", b =>
                 {
                     b.Property<Guid>("Id")
@@ -575,6 +626,22 @@ namespace MedSlot.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_users_patients_patient_id");
+                });
+
+            modelBuilder.Entity("MedSlot.Domain.Patients.PatientCardAccess", b =>
+                {
+                    b.HasOne("MedSlot.Domain.Doctors.Doctor", null)
+                        .WithMany()
+                        .HasForeignKey("DoctorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_patient_card_access_doctors_doctor_id");
+
+                    b.HasOne("MedSlot.Domain.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patient_card_access_patients_patient_id");
                 });
 
             modelBuilder.Entity("MedSlot.Domain.Waitlist.WaitlistEntry", b =>
