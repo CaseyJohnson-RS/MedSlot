@@ -20,6 +20,14 @@ public sealed record AddScheduleOverride(
 /// <summary>Убрать исключение: на эти даты снова действует недельное расписание.</summary>
 public sealed record RemoveScheduleOverride(DoctorId DoctorId, LocalDate From, LocalDate To) : ICommand<Unit>;
 
+/// <summary>
+/// Новое недельное расписание врача. Действует сразу; если активные записи в горизонте записи
+/// оказываются вне нового рабочего времени, расписание не меняется (как и для исключений, domain.md, §5).
+/// Дни без интервалов — нерабочие.
+/// </summary>
+public sealed record ChangeWeeklySchedule(
+    DoctorId DoctorId, IReadOnlyDictionary<IsoDayOfWeek, IReadOnlyList<LocalTimeRange>> Days) : ICommand<Unit>;
+
 /// <summary>Досрочно снять бан: нарушения до этого момента больше не учитываются (ADR 0004).</summary>
 public sealed record LiftPatientBan(PatientId PatientId) : ICommand<Unit>;
 
@@ -88,6 +96,35 @@ internal sealed class RemoveScheduleOverrideHandler(
     }
 }
 
+internal sealed class ChangeWeeklyScheduleHandler(
+    IDoctorRepository doctors, IAppointmentRepository appointments, IUnitOfWork unitOfWork, ClinicPolicy policy, IClock clock)
+    : ICommandHandler<ChangeWeeklySchedule, Unit>
+{
+    public async Task<Result<Unit>> Handle(ChangeWeeklySchedule command, CancellationToken cancellationToken)
+    {
+        var doctor = await doctors.GetByIdAsync(command.DoctorId, cancellationToken);
+        if (doctor is null)
+        {
+            return ApplicationErrors.NotFound("doctor", command.DoctorId);
+        }
+
+        var schedule = WeeklySchedule.Create(command.Days
+            .Where(d => d.Value.Count > 0)
+            .ToDictionary(d => d.Key, d => d.Value.AsEnumerable()));
+        if (schedule.IsFailure)
+        {
+            return schedule.Error;
+        }
+
+        doctor.ChangeSchedule(schedule.Value);
+
+        // Записаться дальше горизонта нельзя, а прошедшие записи новое расписание не затрагивает.
+        var now = clock.GetCurrentInstant();
+        var window = new TimeRange(now, now + policy.BookingHorizon);
+        return await ScheduleChange.SaveIfNoConflictsAsync(doctor, window, appointments, unitOfWork, policy, cancellationToken);
+    }
+}
+
 internal sealed class LiftPatientBanHandler(IPatientRepository patients, IUnitOfWork unitOfWork, IClock clock)
     : ICommandHandler<LiftPatientBan, Unit>
 {
@@ -111,7 +148,7 @@ internal static class ScheduleChange
     /// Сохраняет изменённое расписание, только если все активные записи врача в датах изменения
     /// по-прежнему попадают в рабочее время.
     /// </summary>
-    public static async Task<Result<Unit>> SaveIfNoConflictsAsync(
+    public static Task<Result<Unit>> SaveIfNoConflictsAsync(
         Doctor doctor,
         DateInterval dates,
         IAppointmentRepository appointments,
@@ -122,6 +159,21 @@ internal static class ScheduleChange
         var window = new TimeRange(
             dates.Start.AtStartOfDayInZone(policy.TimeZone).ToInstant(),
             dates.End.PlusDays(1).AtStartOfDayInZone(policy.TimeZone).ToInstant());
+        return SaveIfNoConflictsAsync(doctor, window, appointments, unitOfWork, policy, cancellationToken);
+    }
+
+    /// <summary>
+    /// Сохраняет изменённое расписание, только если все активные записи врача, пересекающиеся с окном,
+    /// по-прежнему попадают в рабочее время.
+    /// </summary>
+    public static async Task<Result<Unit>> SaveIfNoConflictsAsync(
+        Doctor doctor,
+        TimeRange window,
+        IAppointmentRepository appointments,
+        IUnitOfWork unitOfWork,
+        ClinicPolicy policy,
+        CancellationToken cancellationToken)
+    {
         var busy = await appointments.GetBusyRangesAsync(doctor.Id, window, cancellationToken);
 
         var conflicts = busy.Count(time => !doctor.IsWorkingDuring(time, policy.TimeZone));
