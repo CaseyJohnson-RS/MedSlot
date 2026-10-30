@@ -16,6 +16,18 @@ public class LayerDependencyTests
     }
 
     [Fact]
+    public void Contracts_depend_only_on_BCL()
+    {
+        // Публичный язык событий: его используют другие сервисы, он не должен тянуть домен или фреймворки.
+        var result = Types.InAssembly(Assemblies.Contracts)
+            .Should()
+            .OnlyHaveDependenciesOn("System", Namespaces.Contracts)
+            .GetResult();
+
+        result.ShouldBeSuccessful();
+    }
+
+    [Fact]
     public void Application_does_not_depend_on_infrastructure_or_frameworks()
     {
         var result = Types.InAssembly(Assemblies.Application)

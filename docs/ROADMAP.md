@@ -124,29 +124,33 @@ ADR: [0007](adr/0007-idempotency-keys-in-postgres.md).
 
 ---
 
-## Фаза 4. Transactional Outbox + Kafka (1–2 недели)
+## Фаза 4. Transactional Outbox + Kafka (1–2 недели) — ✅ готово, MVP
 
 ### Задачи
-- [ ] Таблица `outbox_messages (id bigserial, event_id uuid, aggregate_key, type, payload jsonb, headers jsonb, occurred_at, published_at, attempts, last_error)`.
-- [ ] `SaveChanges`-интерсептор: доменные события агрегатов → строки outbox в той же транзакции.
-- [ ] **Конверт события:** `eventId`, `eventType`, `schemaVersion`, `occurredAt`, `aggregateId`, `doctorId`, `traceparent`, `payload`. **Никаких ПДн в payload** — только ID.
-- [ ] `OutboxRelay` (`BackgroundService`):
-  - единственный активный экземпляр — `pg_try_advisory_lock` (leader election);
-  - выборка `ORDER BY id LIMIT N`, публикация, отметка `published_at`;
-  - при ошибке публикации ключа — не публиковать последующие события **того же ключа** в этой итерации (сохранение порядка);
-  - экспоненциальный backoff, метрики (лаг, ошибки).
-- [ ] Kafka producer: `enable.idempotence=true`, `acks=all`, ключ = `doctorId`.
-- [ ] Топик `appointments` (6 партиций) + DLT `appointments.dlt`; создание топиков при старте (dev) / скриптом.
-- [ ] Очистка опубликованных записей старше 7 дней.
+- [x] Таблица `outbox_messages (id identity, event_id, event_type, partition_key, envelope jsonb, trace_parent, occurred_at, published_at, attempts, last_error)`; частичный индекс по неопубликованным.
+- [x] `SaveChanges`-интерсептор: доменные события агрегатов → строки outbox в той же транзакции.
+- [x] Проект `MedSlot.Contracts` (только BCL): `EventEnvelope` (`eventId`, `eventType`, `schemaVersion`, `occurredAt`, `aggregateId`, `doctorId`, `traceparent`, `payload`) и payload v1 восьми событий. **Без ПДн** — только id и время.
+- [x] `OutboxRelay` + фоновая служба:
+  - единственный активный экземпляр — `pg_try_advisory_lock` на соединении без пула;
+  - публикация по одной в порядке `id` с ожиданием подтверждения, отметка `published_at`;
+  - при ошибке — события того же врача в итерации пропускаются, остальные идут дальше;
+  - экспоненциальная пауза при ошибках (до 30 с). Метрики лага — в фазе 8.
+- [x] Kafka producer: `enable.idempotence=true`, `acks=all`, ключ = `doctorId`, короткий `message.timeout.ms`; заголовки `event-id`, `event-type`, `schema-version`, `traceparent`.
+- [x] Топики `appointments` (6 партиций) и `appointments.dlt` создаются при старте в Development и в тестах.
+- [x] Очистка опубликованных событий старше 7 дней.
+- [x] `/health/ready` проверяет Kafka.
 
-### Тесты (Testcontainers Postgres + Kafka)
-- [ ] Бронирование → событие в Kafka с правильным ключом и конвертом.
-- [ ] Откат транзакции → события нет.
-- [ ] Kafka недоступна → события копятся в outbox, после восстановления доставлены в исходном порядке.
-- [ ] Два экземпляра relay → публикует только один.
+### Тесты (Testcontainers Postgres + Kafka, 7 тестов)
+- [x] Бронирование → событие в Kafka с ключом, заголовками и конвертом; ПДн в сообщении нет.
+- [x] Откат транзакции → события нет.
+- [x] События врача приходят в одну партицию по порядку.
+- [x] Kafka недоступна → события ждут в outbox с отметкой о попытке, затем доставляются по порядку.
+- [x] Сбой публикации по одному врачу не задерживает других и не даёт его событиям обогнать друг друга.
+- [x] Два relay → активен один; после остановки первого лидером становится второй.
+- [x] Очистка опубликованных по сроку хранения.
 
-**Готово, когда:** события доставляются at-least-once с сохранением порядка по врачу. **Это MVP — можно показывать.**
-ADR: `0008-transactional-outbox.md`, `0009-event-ordering-per-doctor.md`.
+**Итог:** события доставляются at-least-once с сохранением порядка по врачу; проверено на стеке docker-compose (запись и отмена через HTTP → два события в Kafka).
+ADR: [0008](adr/0008-transactional-outbox.md), [0009](adr/0009-event-ordering-per-doctor.md).
 
 ---
 
@@ -276,8 +280,8 @@ ADR: `0011-auth-jwt-refresh-rotation.md`, `0012-personal-data-handling.md`.
 | 0005 | Exclusion constraint против двойной брони ✅ |
 | 0006 | Свой диспетчер вместо MediatR ✅ |
 | 0007 | Ключи идемпотентности в Postgres ✅ |
-| 0008 | Transactional Outbox своими руками (без MassTransit) |
-| 0009 | Порядок событий по врачу: партиционирование + единственный relay |
+| 0008 | Transactional Outbox своими руками (без MassTransit) ✅ |
+| 0009 | Порядок событий по врачу: партиционирование + единственный relay ✅ |
 | 0010 | Inbox для идемпотентных консьюмеров |
 | 0011 | JWT + ротация refresh-токенов |
 | 0012 | Обработка персональных данных |

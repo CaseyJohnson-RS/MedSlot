@@ -30,6 +30,7 @@ Backend-сервис онлайн-записи пациентов к врача�
 src/
   MedSlot.Api              # ASP.NET Core, эндпоинты, auth
   MedSlot.Application      # use cases, порты
+  MedSlot.Contracts        # интеграционные события (конверт и схемы), без зависимостей
   MedSlot.Domain           # агрегаты, инварианты, доменные события
   MedSlot.Infrastructure   # EF Core, Outbox, Kafka producer
   MedSlot.Workers.Notifications

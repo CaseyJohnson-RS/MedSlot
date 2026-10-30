@@ -5,6 +5,7 @@ WORKDIR /repo
 
 # Сначала только файлы проектов — слой restore кэшируется, пока не меняются зависимости.
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
+COPY src/MedSlot.Contracts/MedSlot.Contracts.csproj src/MedSlot.Contracts/
 COPY src/MedSlot.Domain/MedSlot.Domain.csproj src/MedSlot.Domain/
 COPY src/MedSlot.Application/MedSlot.Application.csproj src/MedSlot.Application/
 COPY src/MedSlot.Infrastructure/MedSlot.Infrastructure.csproj src/MedSlot.Infrastructure/
