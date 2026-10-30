@@ -8,7 +8,7 @@ Backend-сервис онлайн-записи пациентов к врача�
 - **Идемпотентность**: повтор POST с тем же `Idempotency-Key` не создаёт дубль.
 - **Гарантированная доставка событий**: Transactional Outbox, at-least-once, идемпотентные консьюмеры.
 - **Порядок событий** по врачу: партиционирование топиков по `doctorId`.
-- **Персональные данные**: маскирование в логах, журнал доступа к карточке пациента.
+- **Персональные данные**: журнал доступа к карточке пациента, контакты для воркеров — только через внутренний API, без ПДн в событиях и логах.
 
 ## Домен
 
@@ -54,7 +54,7 @@ web/                          # фронтенд (сгенерирован AI-а
 | Данные | PostgreSQL, EF Core + Npgsql, миграции EF |
 | Сообщения | Apache Kafka (KRaft), Confluent.Kafka, свой Outbox |
 | Кэш / rate limit | Встроенный ASP.NET Rate Limiting (Redis — по результатам нагрузочных тестов) |
-| Auth | JWT + refresh-токены, роли `Patient` / `Doctor` / `Admin` |
+| Auth | JWT + refresh-токены, роли `Patient` / `Doctor` / `Admin`; ключи сервисов для внутреннего API |
 | Валидация | FluentValidation |
 | Наблюдаемость | OpenTelemetry (трейсы через Kafka), Serilog, Prometheus + Grafana |
 | Тесты | xUnit, Testcontainers (Postgres, Kafka), NetArchTest, NBomber для нагрузки |
@@ -115,6 +115,11 @@ docker compose up -d
 3. `POST /api/v1/appointments` с заголовком `Idempotency-Key` — запись. Повтор с тем же ключом вернёт тот же ответ.
 4. `GET /api/v1/me/appointments` — свои записи; `POST /api/v1/appointments/{id}/cancel` — отмена.
 5. `POST /api/v1/auth/refresh` — новая пара токенов; refresh-токен одноразовый.
+6. `GET /api/v1/me/card-access-log` — кто и зачем смотрел свою карточку, в том числе сервис уведомлений.
+
+Для администратора: `GET /api/v1/patients/{id}/card?purpose=…` — карточка пациента (обращение пишется в журнал), `PUT /api/v1/admin/doctors/{id}/schedule` — новое недельное расписание врача (409, если вне его остаются записи), `/api/v1/admin/doctors/{id}/schedule-overrides` — отпуск и особые часы.
+
+Воркер уведомлений берёт контакты пациента из внутреннего API (`/internal/v1/...`, заголовок `X-Service-Key`). Ключ задаётся в `Internal:ServiceKeys:notifications` у API и в `ClinicApi:ServiceKey` у воркера; в compose — ключ для разработки.
 
 Ошибки приходят в формате `ProblemDetails` с машиночитаемым кодом в поле `code`, например `appointment.slot_already_taken`.
 
