@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NodaTime.Testing;
 using Testcontainers.Kafka;
 using Testcontainers.PostgreSql;
@@ -56,6 +57,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
     public FakeClock Clock { get; } = new(BaseNow);
 
+    /// <summary>Логи API и воркеров из тестов: проверка отсутствия персональных данных.</summary>
+    public CapturedLogs Logs { get; } = new();
+
     public ClinicPolicy Policy { get; } = ClinicPolicy.Default;
 
     public WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("Фикстура не инициализирована.");
@@ -66,7 +70,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await Task.WhenAll(_postgres.StartAsync(), _kafka.StartAsync());
-        _factory = new MedSlotApiFactory(_postgres.GetConnectionString(), KafkaBootstrapServers, Clock);
+        _factory = new MedSlotApiFactory(_postgres.GetConnectionString(), KafkaBootstrapServers, Clock, Logs);
         await _factory.Services.InitializeDatabaseAsync(seedDemoData: false);
         await _factory.Services.InitializeKafkaTopicsAsync();
     }
@@ -168,7 +172,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
         return await (Task<Result<TResponse>>)handle.Invoke(handler, [request, CancellationToken.None])!;
     }
 
-    private sealed class MedSlotApiFactory(string connectionString, string kafkaBootstrapServers, IClock clock)
+    private sealed class MedSlotApiFactory(string connectionString, string kafkaBootstrapServers, IClock clock, CapturedLogs logs)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -185,6 +189,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
             builder.UseSetting("RateLimiting:BookingPermitLimit", "100000");
             builder.UseSetting("RateLimiting:AuthPermitLimit", "100000");
             builder.UseSetting("Internal:ServiceKeys:notifications", NotificationsServiceKey);
+            builder.ConfigureLogging(logging => logging
+                .AddProvider(logs)
+                .AddFilter<CapturedLogs>(null, LogLevel.Debug));
             builder.ConfigureTestServices(services => services.AddSingleton(clock));
         }
     }
