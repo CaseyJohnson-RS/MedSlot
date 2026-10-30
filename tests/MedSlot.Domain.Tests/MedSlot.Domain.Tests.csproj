@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Код 8 = «не найдено ни одного теста». Убрать, когда в фазе 1 появятся первые тесты домена. -->
+    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MedSlot.Domain\MedSlot.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

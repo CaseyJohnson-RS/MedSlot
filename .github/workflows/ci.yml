@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main, deploy]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: Сборка, линт, unit- и архитектурные тесты
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Проверка форматирования
+        run: dotnet format --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Unit-тесты домена
+        run: dotnet test --project tests/MedSlot.Domain.Tests -c Release --no-build
+
+      - name: Архитектурные тесты
+        run: dotnet test --project tests/MedSlot.Architecture.Tests -c Release --no-build
+
+  integration:
+    name: Интеграционные тесты
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Интеграционные тесты
+        run: dotnet test --project tests/MedSlot.Integration.Tests -c Release
+
+  docker:
+    name: Сборка Docker-образа API
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: docker build
+        run: docker build -f src/MedSlot.Api/Dockerfile -t medslot-api:ci .

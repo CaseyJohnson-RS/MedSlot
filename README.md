@@ -75,8 +75,27 @@ MediatR и MassTransit не используются намеренно: в 2025
 
 ## Запуск
 
+Нужны .NET SDK 10 и Docker.
+
 ```bash
 docker compose up -d
-# API:     http://localhost:8080/scalar
-# Grafana: http://localhost:3000
+```
+
+| Сервис | Адрес |
+|---|---|
+| API (Scalar) | http://localhost:8080/scalar |
+| Kafka UI | http://localhost:8081 |
+| PostgreSQL | `localhost:5432`, БД/пользователь/пароль `medslot` |
+| Kafka | `localhost:9092` |
+
+Только инфраструктура, API — из IDE или `dotnet run --project src/MedSlot.Api`:
+
+```bash
+docker compose up -d postgres kafka kafka-ui
+```
+
+Тесты:
+
+```bash
+dotnet test
 ```

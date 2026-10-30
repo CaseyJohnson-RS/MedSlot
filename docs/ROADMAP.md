@@ -22,19 +22,22 @@
 
 ---
 
-## Фаза 0. Каркас (1 неделя)
+## Фаза 0. Каркас (1 неделя) — ✅ готово
 
 ### Задачи
-- [ ] `git init`, `.gitignore`, `.editorconfig`, `Directory.Build.props` (nullable, warnings as errors, `LangVersion latest`), `Directory.Packages.props` (central package management).
-- [ ] Solution и проекты по структуре из README; ссылки строго по направлению зависимостей:
-  `Domain ← Application ← Infrastructure ← Api`, воркеры → `Application` / `Infrastructure` по необходимости.
-- [ ] `MedSlot.Architecture.Tests` (NetArchTest) — сразу:
-  - Domain не зависит ни от чего, кроме BCL (и NodaTime);
-  - Application не зависит от Infrastructure, EF Core, Confluent.Kafka, ASP.NET Core;
-  - Api не обращается к `DbContext` напрямую.
-- [ ] `docker-compose.yml`: Postgres 17, Kafka (KRaft, один брокер), Kafka UI. Healthchecks.
-- [ ] Пустой Minimal API с `/health/live`, `/health/ready`, OpenAPI + Scalar.
-- [ ] GitHub Actions: restore → build → `dotnet format --verify-no-changes` → unit + architecture tests. Integration-тесты — отдельный job (Testcontainers работает на `ubuntu-latest`).
+- [x] `git init`, `.gitignore`, `.editorconfig`, `global.json`, `Directory.Build.props` (nullable, warnings as errors, `LangVersion latest`), `Directory.Packages.props` (central package management).
+- [x] Solution (`MedSlot.slnx`) и проекты по структуре из README; ссылки строго по направлению зависимостей:
+  `Domain ← Application ← Infrastructure ← Api`, воркеры → `Infrastructure`.
+- [x] `MedSlot.Architecture.Tests` (NetArchTest):
+  - Domain зависит только от BCL и NodaTime;
+  - Application не зависит от Infrastructure, хостов, EF Core, Npgsql, Confluent.Kafka, ASP.NET Core;
+  - Infrastructure не зависит от хостов;
+  - Api не использует EF Core напрямую;
+  - воркеры не зависят от Api и друг от друга.
+- [x] Тесты на xUnit v3 + Microsoft Testing Platform (включена в `global.json`), Shouldly.
+- [x] `docker-compose.yml`: API, Postgres 18, Kafka 4.3 (KRaft, один брокер), Kafka UI (kafbat). Healthchecks.
+- [x] Пустой Minimal API с `/health/live`, `/health/ready`, OpenAPI + Scalar; Dockerfile; smoke-тесты через `WebApplicationFactory`.
+- [x] GitHub Actions: restore → `dotnet format --verify-no-changes` → build → unit + architecture tests; интеграционные тесты и сборка Docker-образа — отдельные jobs.
 - [x] `docs/adr/0001-record-architecture-decisions.md` + шаблон (сделано в фазе −1).
 
 **Готово, когда:** `docker compose up -d` поднимает инфраструктуру, `dotnet test` зелёный, CI зелёный.

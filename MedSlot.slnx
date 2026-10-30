@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MedSlot.Api/MedSlot.Api.csproj" />
+    <Project Path="src/MedSlot.Application/MedSlot.Application.csproj" />
+    <Project Path="src/MedSlot.Domain/MedSlot.Domain.csproj" />
+    <Project Path="src/MedSlot.Infrastructure/MedSlot.Infrastructure.csproj" />
+    <Project Path="src/MedSlot.Workers.Analytics/MedSlot.Workers.Analytics.csproj" />
+    <Project Path="src/MedSlot.Workers.Audit/MedSlot.Workers.Audit.csproj" />
+    <Project Path="src/MedSlot.Workers.Notifications/MedSlot.Workers.Notifications.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MedSlot.Architecture.Tests/MedSlot.Architecture.Tests.csproj" />
+    <Project Path="tests/MedSlot.Domain.Tests/MedSlot.Domain.Tests.csproj" />
+    <Project Path="tests/MedSlot.Integration.Tests/MedSlot.Integration.Tests.csproj" />
+  </Folder>
+</Solution>
