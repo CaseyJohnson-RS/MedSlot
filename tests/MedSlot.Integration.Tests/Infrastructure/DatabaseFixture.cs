@@ -144,6 +144,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
             builder.UseSetting("ConnectionStrings:Postgres", connectionString);
             builder.UseSetting("Kafka:BootstrapServers", kafkaBootstrapServers);
             builder.UseSetting("Outbox:RelayEnabled", "false");
+            builder.UseSetting("Waitlist:ExpiryEnabled", "false");
 
             // Все запросы тестов идут с одного «адреса»: лимит не должен им мешать.
             // Сам лимит проверяется на производной фабрике с низким порогом.

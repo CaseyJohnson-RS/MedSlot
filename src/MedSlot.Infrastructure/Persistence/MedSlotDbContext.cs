@@ -3,6 +3,7 @@ using MedSlot.Domain.Common;
 using MedSlot.Domain.Doctors;
 using MedSlot.Domain.Patients;
 using MedSlot.Domain.Services;
+using MedSlot.Domain.Waitlist;
 using MedSlot.Infrastructure.Persistence.Converters;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +18,8 @@ public sealed class MedSlotDbContext(DbContextOptions<MedSlotDbContext> options)
     public DbSet<Patient> Patients => Set<Patient>();
 
     public DbSet<Appointment> Appointments => Set<Appointment>();
+
+    public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

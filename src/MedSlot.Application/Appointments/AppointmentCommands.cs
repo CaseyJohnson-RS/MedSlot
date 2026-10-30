@@ -1,4 +1,5 @@
 using MedSlot.Application.Abstractions;
+using MedSlot.Application.Waitlist;
 using MedSlot.Domain.Appointments;
 using MedSlot.Domain.Clinic;
 using MedSlot.Domain.Common;
@@ -19,8 +20,11 @@ public sealed record CompleteAppointment(AppointmentId AppointmentId) : ICommand
 public sealed record MarkAppointmentNoShow(AppointmentId AppointmentId) : ICommand<Unit>;
 
 internal sealed class CancelAppointmentByPatientHandler(
-    IAppointmentRepository appointments, IUnitOfWork unitOfWork, IClock clock, ClinicPolicy policy)
-    : ICommandHandler<CancelAppointmentByPatient, Unit>
+    IAppointmentRepository appointments,
+    WaitlistOfferService offers,
+    IUnitOfWork unitOfWork,
+    IClock clock,
+    ClinicPolicy policy) : ICommandHandler<CancelAppointmentByPatient, Unit>
 {
     public async Task<Result<Unit>> Handle(CancelAppointmentByPatient command, CancellationToken cancellationToken)
     {
@@ -32,8 +36,18 @@ internal sealed class CancelAppointmentByPatientHandler(
             return ApplicationErrors.NotFound("appointment", command.AppointmentId);
         }
 
-        return await AppointmentChange.SaveAsync(
-            appointment.CancelByPatient(clock.GetCurrentInstant(), policy), unitOfWork, cancellationToken);
+        var cancelled = appointment.CancelByPatient(clock.GetCurrentInstant(), policy);
+        if (cancelled.IsFailure)
+        {
+            return cancelled.Error;
+        }
+
+        // Освободившееся время — первому подходящему в листе ожидания, в той же транзакции.
+        // Отмена клиникой сюда не попадает: врач в это время не принимает.
+        var offer = await offers.OfferFreedSlotAsync(appointment.DoctorId, appointment.Time, cancellationToken);
+
+        var saved = await unitOfWork.SaveChangesAsync(cancellationToken);
+        return saved.IsSuccess ? Unit.Value : WaitlistOfferService.SaveError(saved.Error, offer);
     }
 }
 
