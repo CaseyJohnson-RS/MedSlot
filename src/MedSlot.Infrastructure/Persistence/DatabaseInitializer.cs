@@ -1,6 +1,8 @@
+using MedSlot.Application.Abstractions;
 using MedSlot.Domain.Clinic;
 using MedSlot.Domain.Common;
 using MedSlot.Domain.Doctors;
+using MedSlot.Domain.Identity;
 using MedSlot.Domain.Patients;
 using MedSlot.Domain.Services;
 using Microsoft.EntityFrameworkCore;
@@ -23,9 +25,24 @@ public static class DatabaseInitializer
 
         await db.Database.MigrateAsync(cancellationToken);
 
-        if (seedDemoData && !await db.Doctors.AnyAsync(cancellationToken))
+        if (!seedDemoData)
+        {
+            return;
+        }
+
+        if (!await db.Doctors.AnyAsync(cancellationToken))
         {
             DemoData.Add(db, scope.ServiceProvider.GetRequiredService<ClinicPolicy>());
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        // Отдельная проверка: БД могла быть заполнена демо-данными до появления учётных записей.
+        if (!await db.Users.AnyAsync(cancellationToken) && await db.Doctors.AnyAsync(d => d.Id == DemoData.Therapist, cancellationToken))
+        {
+            DemoData.AddAccounts(
+                db,
+                scope.ServiceProvider.GetRequiredService<IPasswordHasher>(),
+                scope.ServiceProvider.GetRequiredService<IClock>().GetCurrentInstant());
             await db.SaveChangesAsync(cancellationToken);
         }
     }
@@ -43,6 +60,24 @@ public static class DemoData
 
     public static readonly PatientId Alice = new(Guid.Parse("0199c0de-0000-7000-8000-000000000201"));
     public static readonly PatientId Bob = new(Guid.Parse("0199c0de-0000-7000-8000-000000000202"));
+
+    /// <summary>Пароль всех демо-учётных записей. Только для локального стенда.</summary>
+    public const string DemoPassword = "Demo-2026!";
+
+    /// <summary>Демо-учётные записи для каждой роли: логины — в README.</summary>
+    internal static void AddAccounts(MedSlotDbContext db, IPasswordHasher hasher, Instant now)
+    {
+        var hash = hasher.Hash(DemoPassword);
+        static Email Login(string value) => Email.Create(value).Value;
+
+        db.Users.AddRange(
+            UserAccount.ForStaff(UserId.New(), Login("admin@medslot.local"), hash, UserRole.Admin, null, now).Value,
+            UserAccount.ForStaff(UserId.New(), Login("ivanova@medslot.local"), hash, UserRole.Doctor, Therapist, now).Value,
+            UserAccount.ForStaff(UserId.New(), Login("petrov@medslot.local"), hash, UserRole.Doctor, Cardiologist, now).Value,
+            UserAccount.ForStaff(UserId.New(), Login("smirnova@medslot.local"), hash, UserRole.Doctor, Neurologist, now).Value,
+            UserAccount.ForPatient(UserId.New(), Login("alice@example.com"), hash, Alice, now),
+            UserAccount.ForPatient(UserId.New(), Login("bob@example.com"), hash, Bob, now));
+    }
 
     internal static void Add(MedSlotDbContext db, ClinicPolicy policy)
     {
