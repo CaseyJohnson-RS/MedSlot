@@ -41,11 +41,22 @@ public interface IAppointmentRepository
 
     Task<IReadOnlyList<Appointment>> GetByPatientAsync(PatientId patientId, CancellationToken cancellationToken);
 
+    /// <summary>Был ли пациент записан к врачу хотя бы раз — «свой пациент» для доступа к карточке.</summary>
+    Task<bool> DoctorHasPatientAsync(DoctorId doctorId, PatientId patientId, CancellationToken cancellationToken);
+
     /// <summary>Есть ли у пациента активная запись, пересекающаяся с интервалом.</summary>
     Task<bool> HasActiveOverlapAsync(PatientId patientId, TimeRange range, CancellationToken cancellationToken);
 
     /// <summary>Самое давно истёкшее удержание (Held с HoldExpiresAt ≤ now), если есть.</summary>
     Task<Appointment?> GetNextExpiredHoldAsync(Instant now, CancellationToken cancellationToken);
+}
+
+/// <summary>Журнал доступа к карточкам: только пополняется.</summary>
+public interface IPatientCardAccessRepository
+{
+    void Add(PatientCardAccess access);
+
+    Task<IReadOnlyList<PatientCardAccess>> GetForPatientAsync(PatientId patientId, CancellationToken cancellationToken);
 }
 
 public interface IWaitlistRepository

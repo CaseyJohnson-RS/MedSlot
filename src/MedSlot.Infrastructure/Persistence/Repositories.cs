@@ -74,6 +74,11 @@ internal sealed class AppointmentRepository(MedSlotDbContext db) : IAppointmentR
             .Where(a => a.PatientId == patientId)
             .ToListAsync(cancellationToken);
 
+    public Task<bool> DoctorHasPatientAsync(DoctorId doctorId, PatientId patientId, CancellationToken cancellationToken) =>
+        db.Appointments.AnyAsync(
+            a => a.DoctorId == doctorId && a.PatientId == patientId && a.Status != AppointmentStatus.Released,
+            cancellationToken);
+
     public Task<bool> HasActiveOverlapAsync(PatientId patientId, TimeRange range, CancellationToken cancellationToken) =>
         db.Appointments.AnyAsync(
             a => a.PatientId == patientId
