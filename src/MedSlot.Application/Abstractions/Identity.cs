@@ -43,6 +43,15 @@ public interface IPasswordHasher
     PasswordCheck Verify(string passwordHash, string password);
 }
 
+/// <summary>Claims access-токена: их выпускает инфраструктура, а читает API.</summary>
+public static class MedSlotClaims
+{
+    public const string Subject = "sub";
+    public const string Role = "role";
+    public const string PatientId = "patient_id";
+    public const string DoctorId = "doctor_id";
+}
+
 public sealed record AccessToken(string Token, Instant ExpiresAt);
 
 /// <summary>Новый refresh-токен: сам токен уходит клиенту, в БД — только хэш.</summary>
