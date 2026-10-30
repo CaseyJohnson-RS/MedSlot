@@ -85,6 +85,18 @@ public sealed class Doctor : AggregateRoot<DoctorId>
 
     public bool Provides(ServiceId serviceId) => _services.Contains(serviceId);
 
+    /// <summary>Целиком ли интервал попадает в рабочие часы врача (с учётом исключений).</summary>
+    public bool IsWorkingDuring(TimeRange time, DateTimeZone zone)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+
+        // Смены через полночь не поддерживаются: интервал относится к дате своего начала.
+        var date = time.Start.InZone(zone).Date;
+        return WorkingHoursOn(date).Intervals
+            .Select(i => i.ToTimeRange(date, zone))
+            .Any(working => working is { } w && w.Contains(time));
+    }
+
     /// <summary>Рабочие часы на дату: исключение, если оно есть, иначе недельное расписание.</summary>
     public WorkingHours WorkingHoursOn(LocalDate date)
     {
