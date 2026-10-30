@@ -1,0 +1,35 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.rsuser
+.vs/
+.idea/
+*.DotSettings.user
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+artifacts/
+publish/
+
+# NBomber
+reports/
+
+# Node (web/)
+node_modules/
+dist/
+.next/
+
+# Environment
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+*.pfx
+
+# OS
+.DS_Store
+Thumbs.db
