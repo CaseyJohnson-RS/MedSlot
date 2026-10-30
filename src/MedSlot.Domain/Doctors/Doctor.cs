@@ -7,6 +7,12 @@ public sealed class Doctor : AggregateRoot<DoctorId>
     private readonly List<ScheduleOverride> _overrides = [];
     private readonly HashSet<ServiceId> _services = [];
 
+    // Для EF Core.
+    private Doctor()
+        : this(default, null!, null!, null!)
+    {
+    }
+
     private Doctor(DoctorId id, string fullName, string specialization, WeeklySchedule schedule)
         : base(id)
     {

@@ -4,6 +4,15 @@ namespace MedSlot.Domain.Appointments;
 
 public static class AppointmentErrors
 {
+    public static readonly DomainError SlotAlreadyTaken =
+        new("appointment.slot_already_taken", "Это время у врача уже занято.");
+
+    public static readonly DomainError PatientTimeConflict =
+        new("appointment.patient_time_conflict", "У пациента уже есть запись на это время.");
+
+    public static readonly DomainError SlotNotInSchedule =
+        new("appointment.slot_not_in_schedule", "Врач не принимает в это время.");
+
     public static readonly DomainError StartTooSoon =
         new("appointment.start_too_soon", "Слишком поздно записываться на это время.");
 

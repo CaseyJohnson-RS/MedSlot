@@ -7,6 +7,7 @@ services:
       dockerfile: src/MedSlot.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=medslot;Username=medslot;Password=medslot
     ports:
       - "8080:8080"
     depends_on:

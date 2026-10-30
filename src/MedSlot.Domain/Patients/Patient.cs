@@ -4,6 +4,12 @@ namespace MedSlot.Domain.Patients;
 
 public sealed class Patient : AggregateRoot<PatientId>
 {
+    // Для EF Core.
+    private Patient()
+        : this(default, null!, null!, null)
+    {
+    }
+
     private Patient(PatientId id, string fullName, PhoneNumber phone, Email? email)
         : base(id)
     {
