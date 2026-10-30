@@ -6,22 +6,19 @@
 
 ---
 
-## Фаза −1. Доменные решения (до кода, 2–3 вечера)
+## Фаза −1. Доменные решения (до кода, 2–3 вечера) — ✅ готово
 
-Зафиксировать в `docs/domain.md` и ADR. Без этого код придётся переписывать.
+Зафиксировано в [domain.md](domain.md) и ADR 0002–0004.
 
-- [ ] **Статусы записи.** Предлагаемая модель:
-  `Held → Booked → Completed | Cancelled | LateCancelled | NoShow`.
-  Решить, нужен ли `Confirmed` (и кто подтверждает). По умолчанию — убрать.
-- [ ] **Поздняя отмена.** Отмена позже чем за N часов → `LateCancelled` (не `NoShow`). Оба статуса считаются «нарушением».
-- [ ] **NoShow** ставит врач/админ после времени приёма; автоматически — фоновой задачей через X часов после окончания, если запись не `Completed`.
-- [ ] **Бан.** 3 нарушения за скользящие 90 дней → запрет онлайн-записи на 30 дней. Параметры — в конфигурации клиники.
-- [ ] **Лист ожидания.** Запись в очередь на (врач, услуга, диапазон дат). При освобождении слота — `Held` на первого подходящего с `expires_at` (например, 30 мин). Отказ/таймаут → следующий в очереди.
-- [ ] **Время.** Расписание в локальном времени клиники (одна таймзона на клинику), хранение в UTC, NodaTime.
-- [ ] **Шаг сетки слотов.** Например, 15 мин; услуга 30 мин занимает два шага. Слот = свободный интервал нужной длины, выровненный по сетке.
-- [ ] **Пересечения у пациента.** Пациент не может иметь две активные записи, пересекающиеся по времени.
-
-**Готово, когда:** есть `docs/domain.md` с диаграммой состояний (Mermaid) и таблицей правил.
+- [x] **Статусы записи:** `Held`, `Booked`, `Released`, `Cancelled`, `LateCancelled`, `Completed`, `NoShow`; `Confirmed` убран ([ADR 0002](adr/0002-appointment-status-model.md)).
+- [x] **Поздняя отмена** — отдельный статус `LateCancelled`, наравне с `NoShow` считается нарушением.
+- [x] **NoShow** ставит врач после начала приёма; автоматически — через `NoShowAutoMarkDelay` после окончания.
+- [x] **Бан:** 3 нарушения за скользящие 90 дней → 30 дней без онлайн-записи; вычисляется из истории ([ADR 0004](adr/0004-violations-derived-from-history.md)).
+- [x] **Лист ожидания:** FIFO, удержание `Held` с `HoldExpiresAt`, отказ/таймаут → следующий кандидат.
+- [x] **Время:** одна таймзона клиники, UTC в БД, NodaTime ([ADR 0003](adr/0003-time-handling-with-nodatime.md)).
+- [x] **Шаг сетки** 15 мин, длительность услуги кратна шагу.
+- [x] **Пересечения у пациента** запрещены вторым exclusion constraint.
+- [x] Параметры клиники, события с payload, матрица ролей, границы проекта.
 
 ---
 
@@ -38,7 +35,7 @@
 - [ ] `docker-compose.yml`: Postgres 17, Kafka (KRaft, один брокер), Kafka UI. Healthchecks.
 - [ ] Пустой Minimal API с `/health/live`, `/health/ready`, OpenAPI + Scalar.
 - [ ] GitHub Actions: restore → build → `dotnet format --verify-no-changes` → unit + architecture tests. Integration-тесты — отдельный job (Testcontainers работает на `ubuntu-latest`).
-- [ ] `docs/adr/0001-record-architecture-decisions.md` + шаблон.
+- [x] `docs/adr/0001-record-architecture-decisions.md` + шаблон (сделано в фазе −1).
 
 **Готово, когда:** `docker compose up -d` поднимает инфраструктуру, `dotnet test` зелёный, CI зелёный.
 
@@ -97,7 +94,7 @@
 - [ ] Миграции применяются на чистую БД.
 
 **Готово, когда:** тест конкурентности стабильно зелёный (прогнать 20 раз подряд).
-ADR: `0002-exclusion-constraint-for-double-booking.md`, `0003-own-dispatcher-instead-of-mediatr.md`.
+ADR: `0005-exclusion-constraint-for-double-booking.md`, `0006-own-dispatcher-instead-of-mediatr.md`.
 
 ---
 
@@ -122,7 +119,7 @@ ADR: `0002-exclusion-constraint-for-double-booking.md`, `0003-own-dispatcher-ins
 - [ ] Валидация: невалидные данные → 400 с понятными полями.
 
 **Готово, когда:** весь сценарий «найти слот → записаться → отменить» проходит через Scalar.
-ADR: `0004-idempotency-keys-in-postgres.md`.
+ADR: `0007-idempotency-keys-in-postgres.md`.
 
 ---
 
@@ -148,7 +145,7 @@ ADR: `0004-idempotency-keys-in-postgres.md`.
 - [ ] Два экземпляра relay → публикует только один.
 
 **Готово, когда:** события доставляются at-least-once с сохранением порядка по врачу. **Это MVP — можно показывать.**
-ADR: `0005-transactional-outbox.md`, `0006-event-ordering-per-doctor.md`.
+ADR: `0008-transactional-outbox.md`, `0009-event-ordering-per-doctor.md`.
 
 ---
 
@@ -181,7 +178,7 @@ ADR: `0005-transactional-outbox.md`, `0006-event-ordering-per-doctor.md`.
 - [ ] Падение воркера после обработки, до commit → повтор не дублирует эффект.
 
 **Готово, когда:** все три (или два) воркера работают в docker-compose.
-ADR: `0007-inbox-for-idempotent-consumers.md`.
+ADR: `0010-inbox-for-idempotent-consumers.md`.
 
 ---
 
@@ -223,7 +220,7 @@ ADR: `0007-inbox-for-idempotent-consumers.md`.
 - [ ] Пациент A не может прочитать/отменить запись пациента B (403/404).
 - [ ] Чтение карточки создаёт запись в журнале.
 
-ADR: `0008-auth-jwt-refresh-rotation.md`, `0009-personal-data-handling.md`.
+ADR: `0011-auth-jwt-refresh-rotation.md`, `0012-personal-data-handling.md`.
 
 ---
 
@@ -271,16 +268,18 @@ ADR: `0008-auth-jwt-refresh-rotation.md`, `0009-personal-data-handling.md`.
 
 | № | Решение |
 |---|---|
-| 0001 | Ведение ADR |
-| 0002 | Exclusion constraint против двойной брони |
-| 0003 | Свой диспетчер вместо MediatR |
-| 0004 | Ключи идемпотентности в Postgres |
-| 0005 | Transactional Outbox своими руками (без MassTransit) |
-| 0006 | Порядок событий по врачу: партиционирование + единственный relay |
-| 0007 | Inbox для идемпотентных консьюмеров |
-| 0008 | JWT + ротация refresh-токенов |
-| 0009 | Обработка персональных данных |
-| 0010 | NodaTime и работа с таймзонами |
+| 0001 | Ведение ADR ✅ |
+| 0002 | Модель статусов записи ✅ |
+| 0003 | Работа со временем через NodaTime ✅ |
+| 0004 | Нарушения и бан вычисляются из истории ✅ |
+| 0005 | Exclusion constraint против двойной брони |
+| 0006 | Свой диспетчер вместо MediatR |
+| 0007 | Ключи идемпотентности в Postgres |
+| 0008 | Transactional Outbox своими руками (без MassTransit) |
+| 0009 | Порядок событий по врачу: партиционирование + единственный relay |
+| 0010 | Inbox для идемпотентных консьюмеров |
+| 0011 | JWT + ротация refresh-токенов |
+| 0012 | Обработка персональных данных |
 
 ## Риски
 
