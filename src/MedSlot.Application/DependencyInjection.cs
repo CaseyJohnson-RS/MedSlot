@@ -13,6 +13,7 @@ public static class DependencyInjection
         RegisterHandlers(services, typeof(ICommandHandler<,>), typeof(LoggingCommandHandlerDecorator<,>));
         RegisterHandlers(services, typeof(IQueryHandler<,>), typeof(LoggingQueryHandlerDecorator<,>));
         services.AddScoped<Waitlist.WaitlistOfferService>();
+        services.AddScoped<Identity.Sessions>();
         return services;
     }
 

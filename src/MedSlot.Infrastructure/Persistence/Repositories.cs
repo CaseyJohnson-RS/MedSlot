@@ -25,6 +25,8 @@ internal sealed class PatientRepository(MedSlotDbContext db) : IPatientRepositor
 {
     public Task<Patient?> GetByIdAsync(PatientId id, CancellationToken cancellationToken) =>
         db.Patients.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+    public void Add(Patient patient) => db.Patients.Add(patient);
 }
 
 internal sealed class AppointmentRepository(MedSlotDbContext db) : IAppointmentRepository
