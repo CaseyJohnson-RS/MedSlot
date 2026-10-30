@@ -6,6 +6,12 @@ namespace MedSlot.Domain.Services;
 /// <summary>Тип приёма с фиксированной длительностью.</summary>
 public sealed class Service : AggregateRoot<ServiceId>
 {
+    // Для EF Core.
+    private Service()
+        : this(default, null!, default)
+    {
+    }
+
     private Service(ServiceId id, string name, Duration duration)
         : base(id)
     {

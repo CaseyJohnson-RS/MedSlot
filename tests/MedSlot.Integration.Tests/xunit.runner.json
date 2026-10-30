@@ -1,0 +1,5 @@
+{
+  "$schema": "https://xunit.net/schema/current/xunit.runner.schema.json",
+  "$comment": "Тесты меняют общие часы FakeClock, поэтому выполняются последовательно. Конкурентность проверяется внутри отдельных тестов.",
+  "parallelizeTestCollections": false
+}

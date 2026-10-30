@@ -9,6 +9,12 @@ namespace MedSlot.Domain.Appointments;
 /// </summary>
 public sealed class Appointment : AggregateRoot<AppointmentId>
 {
+    // Для EF Core.
+    private Appointment()
+        : base(default)
+    {
+    }
+
     private Appointment(
         AppointmentId id,
         DoctorId doctorId,

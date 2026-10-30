@@ -11,6 +11,9 @@ public sealed class WeeklySchedule
 
     public static WeeklySchedule Empty { get; } = new(new Dictionary<IsoDayOfWeek, WorkingHours>());
 
+    /// <summary>Рабочие дни с их часами; дни без приёма отсутствуют.</summary>
+    public IReadOnlyDictionary<IsoDayOfWeek, WorkingHours> Days => _days;
+
     public static Result<WeeklySchedule> Create(IReadOnlyDictionary<IsoDayOfWeek, IEnumerable<LocalTimeRange>> days)
     {
         ArgumentNullException.ThrowIfNull(days);

@@ -69,35 +69,30 @@
 
 ---
 
-## Фаза 2. Персистентность и бронирование (1–2 недели)
+## Фаза 2. Персистентность и бронирование (1–2 недели) — ✅ готово
 
 ### Задачи
-- [ ] EF Core + Npgsql, конфигурации через `IEntityTypeConfiguration`, snake_case, value converters для ID и NodaTime.
-- [ ] Миграция с `btree_gist` и exclusion constraints:
-  ```sql
-  EXCLUDE USING gist (doctor_id WITH =, tstzrange(starts_at, ends_at) WITH &&)
-    WHERE (status IN ('Held','Booked'));
-  EXCLUDE USING gist (patient_id WITH =, tstzrange(starts_at, ends_at) WITH &&)
-    WHERE (status IN ('Held','Booked'));
-  ```
-- [ ] Optimistic concurrency через `xmin` для `Appointment` (гонки переходов статуса).
-- [ ] Маппинг ошибок Postgres: `23P01` (exclusion violation) → доменная ошибка `SlotAlreadyTaken`; `DbUpdateConcurrencyException` → `ConcurrentModification` (409).
-- [ ] Порты в Application: `IAppointmentRepository`, `IDoctorRepository`, `IUnitOfWork`.
-- [ ] Use cases (свой простой диспетчер — интерфейсы `ICommandHandler<TCommand, TResult>` / `IQueryHandler<,>` + регистрация через DI, без MediatR):
-  - `BookAppointment`, `CancelAppointment`, `CompleteAppointment`, `MarkNoShow`;
-  - `GetAvailableSlots`, `GetDoctorSchedule`, `GetPatientAppointments`.
-- [ ] Декораторы для хендлеров: логирование, транзакция, валидация.
-- [ ] Сиды для разработки: 3–5 врачей, услуги, расписания.
+- [x] EF Core + Npgsql, конфигурации через `IEntityTypeConfiguration`, snake_case, value converters для ID и NodaTime. Расписание и исключения — в `jsonb` через отдельные DTO.
+- [x] Миграция с `btree_gist` и exclusion constraints для врача и пациента (только активные статусы, интервалы `[)`).
+- [x] Optimistic concurrency через `xmin` для `Appointment`.
+- [x] Маппинг ошибок Postgres в `UnitOfWork`: `23P01` → `SlotAlreadyTaken` / `PatientTimeConflict` (по имени constraint); `DbUpdateConcurrencyException` → `ConcurrentModification`.
+- [x] Advisory-блокировки врача и пациента при сохранении новых записей: без них параллельные вставки взаимоблокировались (`40P01`) — см. ADR 0005.
+- [x] Порты в Application: репозитории врачей, услуг, пациентов, записей; `IUnitOfWork`.
+- [x] Обработчики без MediatR (ADR 0006): `BookAppointment`, `CancelAppointmentByPatient`, `CancelAppointmentByClinic`, `CompleteAppointment`, `MarkAppointmentNoShow`; `GetAvailableSlots`, `GetDoctorSchedule`, `GetPatientAppointments`.
+- [x] Логирующий декоратор (без содержимого команд — там ПДн). Транзакционный не нужен: одна команда — один `SaveChanges`. Валидация входа — в фазе 3 на уровне API.
+- [x] Демо-данные для разработки: 3 врача, 2 услуги, 2 пациента с фиксированными id; миграции и демо-данные применяются при старте в Development.
+- [x] `/health/ready` проверяет подключение к Postgres.
 
-### Тесты (`MedSlot.Integration.Tests`, Testcontainers Postgres)
-- [ ] **Главный тест:** 50 параллельных `BookAppointment` на один слот → ровно 1 успех, 49 `SlotAlreadyTaken`.
-- [ ] Пересекающиеся, но не совпадающие интервалы (30-мин и 15-мин услуги).
-- [ ] Отменённая запись не блокирует слот.
-- [ ] Одновременные `Cancel` и `Complete` → один проходит, второй получает 409.
-- [ ] Миграции применяются на чистую БД.
+### Тесты (`MedSlot.Integration.Tests`, Testcontainers Postgres, 20 тестов)
+- [x] **Главный тест:** 50 параллельных `BookAppointment` на один слот → ровно 1 успех, 49 `SlotAlreadyTaken`. 20 прогонов подряд зелёные; без constraint тест падает.
+- [x] Пересекающиеся, но не совпадающие интервалы (30-мин и 15-мин услуги); запись встык допустима.
+- [x] Пациент не может быть у двух врачей одновременно.
+- [x] Отменённая запись не блокирует слот.
+- [x] Параллельные изменения одной записи → второе сохранение получает `ConcurrentModification`.
+- [x] Три поздние отмены → бан онлайн-записи; администратор записать может.
+- [x] Миграции применяются на чистую БД; exclusion constraints существуют; расписание в `jsonb` переживает сохранение и загрузку.
 
-**Готово, когда:** тест конкурентности стабильно зелёный (прогнать 20 раз подряд).
-ADR: `0005-exclusion-constraint-for-double-booking.md`, `0006-own-dispatcher-instead-of-mediatr.md`.
+ADR: [0005](adr/0005-exclusion-constraint-for-double-booking.md), [0006](adr/0006-own-dispatcher-instead-of-mediatr.md).
 
 ---
 
@@ -275,8 +270,8 @@ ADR: `0011-auth-jwt-refresh-rotation.md`, `0012-personal-data-handling.md`.
 | 0002 | Модель статусов записи ✅ |
 | 0003 | Работа со временем через NodaTime ✅ |
 | 0004 | Нарушения и бан вычисляются из истории ✅ |
-| 0005 | Exclusion constraint против двойной брони |
-| 0006 | Свой диспетчер вместо MediatR |
+| 0005 | Exclusion constraint против двойной брони ✅ |
+| 0006 | Свой диспетчер вместо MediatR ✅ |
 | 0007 | Ключи идемпотентности в Postgres |
 | 0008 | Transactional Outbox своими руками (без MassTransit) |
 | 0009 | Порядок событий по врачу: партиционирование + единственный relay |

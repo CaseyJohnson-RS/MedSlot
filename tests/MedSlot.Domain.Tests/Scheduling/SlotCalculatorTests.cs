@@ -149,6 +149,31 @@ public class SlotCalculatorTests
         slots.ShouldAllBe(s => s.Duration == Duration.FromMinutes(30));
     }
 
+    [Theory]
+    [InlineData(9, 0, true)]
+    [InlineData(9, 30, true)] // последний, который помещается до 10:00
+    [InlineData(9, 45, false)] // не помещается
+    [InlineData(9, 7, false)] // не по сетке
+    [InlineData(8, 45, false)] // до начала смены
+    public void Is_within_schedule(int hour, int minute, bool expected)
+    {
+        var service = NewService(30);
+        var doctor = NewDoctor(Weekdays(Hours(9, 0, 10, 0)), service);
+
+        SlotCalculator.IsWithinSchedule(doctor, service, Msk(Monday, hour, minute), Policy).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Is_within_schedule_ignores_busy_and_lead_time()
+    {
+        var service = NewService(30);
+        var doctor = NewDoctor(Weekdays(Hours(9, 0, 10, 0)), service);
+
+        // Даже если «сейчас» — после приёма, проверяется только сетка расписания.
+        SlotCalculator.IsWithinSchedule(doctor, service, Msk(Monday, 9, 0), Policy).ShouldBeTrue();
+        SlotCalculator.IsWithinSchedule(doctor, service, Msk(Monday.PlusDays(5), 9, 0), Policy).ShouldBeFalse(); // суббота
+    }
+
     [Fact]
     public void Working_interval_inside_skipped_hour_is_ignored()
     {

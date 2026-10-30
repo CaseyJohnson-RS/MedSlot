@@ -40,35 +40,53 @@ public static class SlotCalculator
 
         foreach (var date in dates)
         {
-            foreach (var interval in doctor.WorkingHoursOn(date).Intervals)
+            foreach (var candidate in ScheduledSlots(doctor, date, service.Duration, policy))
             {
-                if (interval.ToTimeRange(date, policy.TimeZone) is not { } working)
+                if (candidate.Start > latestStart)
                 {
-                    continue;
+                    // Даты и интервалы идут по возрастанию: дальше будет только позже горизонта.
+                    return Result.Success<IReadOnlyList<TimeRange>>(slots);
                 }
 
-                for (var start = working.Start; start + service.Duration <= working.End; start += policy.SlotGridStep)
+                if (candidate.Start >= earliestStart && !occupied.Exists(o => o.Overlaps(candidate)))
                 {
-                    if (start > latestStart)
-                    {
-                        // Даты и интервалы идут по возрастанию: дальше будет только позже горизонта.
-                        return Result.Success<IReadOnlyList<TimeRange>>(slots);
-                    }
-
-                    if (start < earliestStart)
-                    {
-                        continue;
-                    }
-
-                    var candidate = TimeRange.FromStart(start, service.Duration);
-                    if (!occupied.Exists(o => o.Overlaps(candidate)))
-                    {
-                        slots.Add(candidate);
-                    }
+                    slots.Add(candidate);
                 }
             }
         }
 
         return Result.Success<IReadOnlyList<TimeRange>>(slots);
+    }
+
+    /// <summary>
+    /// Попадает ли приём, начинающийся в <paramref name="start"/>, в сетку расписания врача.
+    /// Занятость, горизонт и минимальное время до записи не проверяются.
+    /// </summary>
+    public static bool IsWithinSchedule(Doctor doctor, Service service, Instant start, ClinicPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(doctor);
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(policy);
+
+        // Смены через полночь не поддерживаются, поэтому приём принадлежит дате своего начала.
+        var date = start.InZone(policy.TimeZone).Date;
+        return ScheduledSlots(doctor, date, service.Duration, policy).Any(s => s.Start == start);
+    }
+
+    /// <summary>Все слоты по сетке расписания на дату, без учёта занятости и ограничений по времени.</summary>
+    private static IEnumerable<TimeRange> ScheduledSlots(Doctor doctor, LocalDate date, Duration duration, ClinicPolicy policy)
+    {
+        foreach (var interval in doctor.WorkingHoursOn(date).Intervals)
+        {
+            if (interval.ToTimeRange(date, policy.TimeZone) is not { } working)
+            {
+                continue;
+            }
+
+            for (var start = working.Start; start + duration <= working.End; start += policy.SlotGridStep)
+            {
+                yield return TimeRange.FromStart(start, duration);
+            }
+        }
     }
 }

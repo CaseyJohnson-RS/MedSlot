@@ -149,7 +149,7 @@ stateDiagram-v2
 
 | Переход | Кто | Условия | Событие |
 |---|---|---|---|
-| → `Booked` | Пациент | Нет бана; слот свободен и в горизонте; `start ≥ now + MinBookingLeadTime`; активных записей < `MaxActiveAppointmentsPerPatient`; нет пересечений у пациента | `AppointmentBooked` |
+| → `Booked` | Пациент | Нет бана; начало попадает в сетку расписания врача; слот свободен и в горизонте; `start ≥ now + MinBookingLeadTime`; активных записей < `MaxActiveAppointmentsPerPatient`; нет пересечений у пациента | `AppointmentBooked` |
 | → `Booked` | Админ | То же, кроме бана и лимита активных записей | `AppointmentBooked` |
 | → `Held` | Система | См. §8 | `WaitlistSlotOffered` |
 | `Held → Booked` | Пациент | `now < HoldExpiresAt` | `WaitlistOfferAccepted`, `AppointmentBooked` |
