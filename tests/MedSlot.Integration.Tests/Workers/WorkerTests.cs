@@ -42,6 +42,10 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
             {
                 ConnectionString = fixture.DatabaseConnectionString("medslot_notifications_tests"),
                 ClinicConnectionString = fixture.ClinicConnectionString,
+
+                // Маленькая пачка: очередь в общей БД всегда больше неё, и обработка «до пустой очереди»
+                // проверяется в каждом прогоне, а не только при неудачном порядке тестов.
+                DispatchBatchSize = 5,
             },
             Consumer(NotificationsWorker.ConsumerName, group)));
         _audit = Build(services => services.AddAuditWorker(
@@ -117,6 +121,19 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
             .Where(n => n.AppointmentId == appointmentId)
             .OrderBy(n => n.DueAt)
             .ToListAsync(Ct);
+    }
+
+    /// <summary>
+    /// Прогоняет диспетчер до пустой очереди созревших уведомлений. БД уведомлений общая для тестов,
+    /// и в одну пачку (50) уведомление этого теста может не попасть. Цикл конечен: каждое обработанное
+    /// уведомление отправлено, помечено неудачным или перенесено в будущее.
+    /// </summary>
+    private async Task DispatchAllDueAsync()
+    {
+        var dispatcher = _notifications.GetRequiredService<NotificationDispatcher>();
+        while (await dispatcher.DispatchDueAsync(Ct) > 0)
+        {
+        }
     }
 
     private async Task<int> AuditRecordsFor(Guid aggregateId)
@@ -259,10 +276,9 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
         var appointment = Guid.NewGuid();
         var startsAt = BaseNow + Duration.FromDays(3);
         await NotificationsConsumer.ProcessAsync(Message(Booked(appointment, clinic.Patient.Value, startsAt)), Ct);
-        var dispatcher = _notifications.GetRequiredService<NotificationDispatcher>();
-
         // Сейчас созрело только подтверждение.
-        (await dispatcher.DispatchDueAsync(Ct)).ShouldBeGreaterThanOrEqualTo(1);
+        await DispatchAllDueAsync();
+
         // В общей БД уведомлений могут ждать и уведомления других тестов — смотрим только своего пациента.
         var confirmation = _sender.Sent
             .Where(m => m.Message.PatientId == clinic.Patient.Value && m.Message.Subject == "Вы записаны к врачу")
@@ -272,7 +288,7 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
 
         // За сутки до приёма уходит напоминание.
         fixture.Clock.Reset(startsAt - Duration.FromHours(24));
-        await dispatcher.DispatchDueAsync(Ct);
+        await DispatchAllDueAsync();
         _sender.Sent.ShouldContain(m => m.Message.PatientId == clinic.Patient.Value && m.Message.Subject == "Напоминание о приёме");
 
         (await NotificationsFor(appointment)).ShouldAllBe(n => n.Status == NotificationStatus.Sent && n.SentAt != null);
@@ -281,10 +297,19 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Notification_for_unknown_patient_fails_without_sending()
     {
+        // Впереди в очереди — уведомления, созревшие раньше, больше одной пачки.
+        // Так воспроизводится падение на CI: уведомление теста не попадало в первую пачку.
+        fixture.Clock.Reset(BaseNow - Duration.FromHours(1));
+        for (var i = 0; i < 6; i++)
+        {
+            await NotificationsConsumer.ProcessAsync(Message(Booked(Guid.NewGuid(), Guid.NewGuid(), BaseNow + Duration.FromHours(5))), Ct);
+        }
+
+        fixture.Clock.Reset(BaseNow);
         var appointment = Guid.NewGuid();
         await NotificationsConsumer.ProcessAsync(Message(Booked(appointment, Guid.NewGuid(), BaseNow + Duration.FromHours(5))), Ct);
 
-        await _notifications.GetRequiredService<NotificationDispatcher>().DispatchDueAsync(Ct);
+        await DispatchAllDueAsync();
 
         var notification = (await NotificationsFor(appointment)).ShouldHaveSingleItem();
         notification.Status.ShouldBe(NotificationStatus.Failed);
