@@ -20,6 +20,8 @@ public interface IServiceRepository
 public interface IPatientRepository
 {
     Task<Patient?> GetByIdAsync(PatientId id, CancellationToken cancellationToken);
+
+    void Add(Patient patient);
 }
 
 public interface IAppointmentRepository

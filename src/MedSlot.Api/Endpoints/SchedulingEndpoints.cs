@@ -14,7 +14,8 @@ internal static class SchedulingEndpoints
 {
     public static IEndpointRouteBuilder MapSchedulingEndpoints(this IEndpointRouteBuilder app)
     {
-        var doctors = app.MapGroup("/api/v1/doctors/{doctorId:guid}").WithTags("Врачи");
+        // Расписание и свободное время открыты всем: по ним выбирают, куда записаться.
+        var doctors = app.MapGroup("/api/v1/doctors/{doctorId:guid}").WithTags("Врачи").AllowAnonymous();
 
         doctors.MapGet("/schedule", GetSchedule)
             .WithName("GetDoctorSchedule")
@@ -31,12 +32,6 @@ internal static class SchedulingEndpoints
             .Produces<IReadOnlyList<SlotResponse>>()
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
-
-        app.MapGroup("/api/v1/patients/{patientId:guid}").WithTags("Пациенты")
-            .MapGet("/appointments", GetPatientAppointments)
-            .WithName("GetPatientAppointments")
-            .WithSummary("Записи пациента")
-            .Produces<IReadOnlyList<AppointmentResponse>>();
 
         return app;
     }
@@ -56,9 +51,4 @@ internal static class SchedulingEndpoints
                 LocalDate.FromDateOnly(query.To)),
             ct))
             .ToResponse(slots => TypedResults.Ok(slots.Select(SlotResponse.Create).ToList()));
-
-    private static async Task<IResult> GetPatientAppointments(
-        Guid patientId, IQueryHandler<GetPatientAppointments, IReadOnlyList<AppointmentDto>> handler, CancellationToken ct) =>
-        (await handler.Handle(new GetPatientAppointments(new PatientId(patientId)), ct))
-            .ToResponse(list => TypedResults.Ok(list.Select(AppointmentResponse.Create).ToList()));
 }

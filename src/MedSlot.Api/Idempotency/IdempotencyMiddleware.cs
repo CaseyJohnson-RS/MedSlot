@@ -58,7 +58,7 @@ internal sealed class IdempotencyMiddleware(RequestDelegate next)
         }
 
         var ct = context.RequestAborted;
-        var scope = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? AnonymousScope;
+        var scope = context.User.FindFirstValue(MedSlotClaims.Subject) ?? AnonymousScope;
         var hash = await HashRequestAsync(context.Request, ct);
 
         if (await store.FindAsync(scope, key, ct) is { } existing)

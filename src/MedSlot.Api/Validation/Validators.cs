@@ -10,16 +10,10 @@ internal sealed class BookAppointmentRequestValidator : AbstractValidator<BookAp
 {
     public BookAppointmentRequestValidator()
     {
-        RuleFor(r => r.PatientId).NotEmpty();
         RuleFor(r => r.DoctorId).NotEmpty();
         RuleFor(r => r.ServiceId).NotEmpty();
         RuleFor(r => r.StartsAt).NotEmpty().WithMessage("Укажите время начала приёма.");
     }
-}
-
-internal sealed class CancelByPatientRequestValidator : AbstractValidator<CancelByPatientRequest>
-{
-    public CancelByPatientRequestValidator() => RuleFor(r => r.PatientId).NotEmpty();
 }
 
 internal sealed class CancelByClinicRequestValidator : AbstractValidator<CancelByClinicRequest>
@@ -32,6 +26,73 @@ internal sealed class CancelByClinicRequestValidator : AbstractValidator<CancelB
             .WithMessage("Код причины: латиница в нижнем регистре, цифры и подчёркивания, например doctor_sick.");
 }
 
+internal sealed class RegisterRequestValidator : AbstractValidator<RegisterRequest>
+{
+    public RegisterRequestValidator()
+    {
+        RuleFor(r => r.FullName).NotEmpty().MaximumLength(200);
+        RuleFor(r => r.Phone).NotEmpty();
+        RuleFor(r => r.Email).NotEmpty().MaximumLength(254);
+        RuleFor(r => r.Password)
+            .NotEmpty()
+            .MinimumLength(8)
+            .MaximumLength(128)
+            .Must(p => p.Any(char.IsLetter) && p.Any(char.IsDigit))
+            .WithMessage("Пароль: не короче 8 символов, хотя бы одна буква и одна цифра.");
+    }
+}
+
+internal sealed class LoginRequestValidator : AbstractValidator<LoginRequest>
+{
+    public LoginRequestValidator()
+    {
+        RuleFor(r => r.Email).NotEmpty();
+        RuleFor(r => r.Password).NotEmpty();
+    }
+}
+
+internal sealed class RefreshRequestValidator : AbstractValidator<RefreshRequest>
+{
+    public RefreshRequestValidator() => RuleFor(r => r.RefreshToken).NotEmpty().MaximumLength(100);
+}
+
+internal sealed class AdminBookAppointmentRequestValidator : AbstractValidator<AdminBookAppointmentRequest>
+{
+    public AdminBookAppointmentRequestValidator()
+    {
+        RuleFor(r => r.PatientId).NotEmpty();
+        RuleFor(r => r.DoctorId).NotEmpty();
+        RuleFor(r => r.ServiceId).NotEmpty();
+        RuleFor(r => r.StartsAt).NotEmpty();
+    }
+}
+
+internal sealed class CreateStaffRequestValidator : AbstractValidator<CreateStaffRequest>
+{
+    public CreateStaffRequestValidator()
+    {
+        RuleFor(r => r.Email).NotEmpty().MaximumLength(254);
+        RuleFor(r => r.Password)
+            .NotEmpty()
+            .MinimumLength(12)
+            .MaximumLength(128)
+            .Must(p => p.Any(char.IsLetter) && p.Any(char.IsDigit))
+            .WithMessage("Пароль сотрудника: не короче 12 символов, хотя бы одна буква и одна цифра.");
+        RuleFor(r => r.Role).IsInEnum();
+    }
+}
+
+internal sealed class ScheduleOverrideRequestValidator : AbstractValidator<ScheduleOverrideRequest>
+{
+    public ScheduleOverrideRequestValidator()
+    {
+        RuleFor(r => r.To).GreaterThanOrEqualTo(r => r.From).WithMessage("Дата окончания не может быть раньше даты начала.");
+        RuleFor(r => r.Kind).IsInEnum();
+        RuleForEach(r => r.Hours).Must(h => h.To > h.From).WithMessage("Конец интервала должен быть позже начала.");
+        RuleFor(r => r.Reason).MaximumLength(200);
+    }
+}
+
 internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitlistRequest>
 {
     // Не дальше горизонта записи (60 дней).
@@ -39,7 +100,6 @@ internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitl
 
     public JoinWaitlistRequestValidator()
     {
-        RuleFor(r => r.PatientId).NotEmpty();
         RuleFor(r => r.DoctorId).NotEmpty();
         RuleFor(r => r.ServiceId).NotEmpty();
         RuleFor(r => r.To)
@@ -50,11 +110,6 @@ internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitl
             .WithName("To")
             .WithMessage($"Диапазон не длиннее {MaxDays} дней.");
     }
-}
-
-internal sealed class WaitlistActionRequestValidator : AbstractValidator<WaitlistActionRequest>
-{
-    public WaitlistActionRequestValidator() => RuleFor(r => r.PatientId).NotEmpty();
 }
 
 /// <summary>Параметры запроса свободных слотов.</summary>

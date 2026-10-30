@@ -1,10 +1,12 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using MedSlot.Api.Contracts;
 using MedSlot.Domain.Appointments;
+using MedSlot.Domain.Common;
 using MedSlot.Integration.Tests.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -34,18 +36,39 @@ public sealed class HttpApiTests : IDisposable
 
     public void Dispose() => _client.Dispose();
 
-    private static BookAppointmentRequest BookRequest(TestClinic clinic, int hour, int minute = 0, int patient = 0) =>
-        new(clinic.Patients[patient].Value, clinic.Doctor.Value, clinic.Long30.Value, Msk(NextMonday, hour, minute).ToDateTimeOffset());
+    /// <summary>Запрос на запись и пациент, от имени которого он отправляется.</summary>
+    private sealed record Booking(BookAppointmentRequest Request, PatientId Patient);
 
-    private Task<HttpResponseMessage> Post(string url, object body, string? idempotencyKey = null, HttpClient? client = null)
+    private static Booking BookRequest(TestClinic clinic, int hour, int minute = 0, int patient = 0) =>
+        new(new(clinic.Doctor.Value, clinic.Long30.Value, Msk(NextMonday, hour, minute).ToDateTimeOffset()), clinic.Patients[patient]);
+
+    private async Task<HttpResponseMessage> Post(string url, Booking booking, string? idempotencyKey = null, HttpClient? client = null) =>
+        await Post(url, booking.Request, idempotencyKey, client, await _fixture.AccessTokenAsync(booking.Patient));
+
+    private Task<HttpResponseMessage> Post(
+        string url, object? body, string? idempotencyKey = null, HttpClient? client = null, string? token = null)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(body) };
+        var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = body is null ? null : JsonContent.Create(body) };
         if (idempotencyKey is not null)
         {
             request.Headers.Add("Idempotency-Key", idempotencyKey);
         }
 
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
         return (client ?? _client).SendAsync(request, Ct);
+    }
+
+    private async Task<T?> Get<T>(string url, PatientId asPatient, HttpClient? client = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _fixture.AccessTokenAsync(asPatient));
+        using var response = await (client ?? _client).SendAsync(request, Ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<T>(Json, Ct);
     }
 
     private static async Task<string?> ErrorCode(HttpResponseMessage response)
@@ -72,15 +95,16 @@ public sealed class HttpApiTests : IDisposable
         var id = (await booked.Content.ReadFromJsonAsync<AppointmentCreatedResponse>(Ct))!.Id;
         booked.Headers.Location!.ToString().ShouldEndWith($"/api/v1/appointments/{id}");
 
-        var appointment = await _client.GetFromJsonAsync<AppointmentResponse>(booked.Headers.Location, Json, Ct);
+        var appointment = await Get<AppointmentResponse>(booked.Headers.Location.ToString(), clinic.Patient);
         appointment!.Status.ShouldBe(AppointmentStatus.Booked);
         appointment.StartsAt.ShouldBe(Msk(NextMonday, 10).ToDateTimeOffset());
 
-        var mine = await _client.GetFromJsonAsync<List<AppointmentResponse>>($"/api/v1/patients/{clinic.Patient.Value}/appointments", Json, Ct);
+        var mine = await Get<List<AppointmentResponse>>("/api/v1/me/appointments", clinic.Patient);
         mine!.ShouldHaveSingleItem().Id.ShouldBe(id);
 
-        (await Post($"/api/v1/appointments/{id}/cancel", new CancelByPatientRequest(clinic.Patient.Value))).StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        (await _client.GetFromJsonAsync<AppointmentResponse>(booked.Headers.Location, Json, Ct))!.Status.ShouldBe(AppointmentStatus.Cancelled);
+        (await Post($"/api/v1/appointments/{id}/cancel", null, token: await _fixture.AccessTokenAsync(clinic.Patient)))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await Get<AppointmentResponse>(booked.Headers.Location.ToString(), clinic.Patient))!.Status.ShouldBe(AppointmentStatus.Cancelled);
     }
 
     [Fact]
@@ -98,11 +122,13 @@ public sealed class HttpApiTests : IDisposable
     [Fact]
     public async Task Invalid_request_returns_validation_problem()
     {
-        var response = await Post("/api/v1/appointments", new BookAppointmentRequest(Guid.Empty, Guid.Empty, Guid.Empty, default));
+        var clinic = await _fixture.CreateClinicAsync();
+
+        var response = await Post("/api/v1/appointments", new Booking(new BookAppointmentRequest(Guid.Empty, Guid.Empty, default), clinic.Patient));
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>(Ct);
-        problem!.Errors.Keys.ShouldBe(["PatientId", "DoctorId", "ServiceId", "StartsAt"], ignoreOrder: true);
+        problem!.Errors.Keys.ShouldBe(["DoctorId", "ServiceId", "StartsAt"], ignoreOrder: true);
     }
 
     [Fact]
@@ -121,7 +147,8 @@ public sealed class HttpApiTests : IDisposable
     {
         var clinic = await _fixture.CreateClinicAsync(patients: 2);
 
-        var unknownDoctor = await Post("/api/v1/appointments", BookRequest(clinic, 10) with { DoctorId = Guid.NewGuid() });
+        var booking = BookRequest(clinic, 10);
+        var unknownDoctor = await Post("/api/v1/appointments", booking with { Request = booking.Request with { DoctorId = Guid.NewGuid() } });
         unknownDoctor.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await ErrorCode(unknownDoctor)).ShouldBe("doctor.not_found");
 
@@ -238,20 +265,22 @@ public sealed class HttpApiTests : IDisposable
     [Fact]
     public async Task Booking_is_rate_limited()
     {
-        var clinic = await _fixture.CreateClinicAsync(patients: 3);
+        var clinic = await _fixture.CreateClinicAsync(patients: 2);
         await using var limited = _fixture.Factory.WithWebHostBuilder(b => b.UseSetting("RateLimiting:BookingPermitLimit", "2"));
         using var client = limited.CreateClient();
 
-        (await Post("/api/v1/appointments", BookRequest(clinic, 10, patient: 0), client: client)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await Post("/api/v1/appointments", BookRequest(clinic, 11, patient: 1), client: client)).StatusCode.ShouldBe(HttpStatusCode.Created);
-        var third = await Post("/api/v1/appointments", BookRequest(clinic, 12, patient: 2), client: client);
+        // Лимит — на пользователя: третья запись одного пациента за минуту отклоняется.
+        (await Post("/api/v1/appointments", BookRequest(clinic, 10), client: client)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await Post("/api/v1/appointments", BookRequest(clinic, 11), client: client)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        var third = await Post("/api/v1/appointments", BookRequest(clinic, 12), client: client);
 
         third.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
         third.Headers.RetryAfter.ShouldNotBeNull();
         (await ErrorCode(third)).ShouldBe("rate_limit.exceeded");
 
-        // Чтение не ограничено.
-        (await client.GetAsync($"/api/v1/patients/{clinic.Patient.Value}/appointments", Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        // У другого пациента свой счётчик; чтение не ограничено.
+        (await Post("/api/v1/appointments", BookRequest(clinic, 14, patient: 1), client: client)).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await Get<List<AppointmentResponse>>("/api/v1/me/appointments", clinic.Patient, client)).ShouldNotBeNull();
     }
 
     [Fact]
@@ -261,7 +290,9 @@ public sealed class HttpApiTests : IDisposable
         var book = document!["paths"]!["/api/v1/appointments"]!["post"]!;
 
         book["parameters"]!.AsArray().ShouldContain(p => p!["name"]!.GetValue<string>() == "Idempotency-Key" && p["in"]!.GetValue<string>() == "header");
-        book["responses"]!.AsObject().Select(r => r.Key).ShouldBe(["201", "400", "403", "404", "409", "422", "429"], ignoreOrder: true);
+        book["responses"]!.AsObject().Select(r => r.Key).ShouldBe(["201", "400", "401", "403", "404", "409", "422", "429"], ignoreOrder: true);
+        book["security"]!.AsArray().ShouldNotBeEmpty();
+        document["components"]!["securitySchemes"]!["Bearer"]!["scheme"]!.GetValue<string>().ShouldBe("bearer");
 
         var status = document["components"]!["schemas"]!["AppointmentStatus"];
         status.ShouldNotBeNull();

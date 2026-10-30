@@ -3,6 +3,7 @@ using MedSlot.Domain.Clinic;
 using MedSlot.Infrastructure.Idempotency;
 using MedSlot.Infrastructure.Outbox;
 using MedSlot.Infrastructure.Persistence;
+using MedSlot.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
@@ -15,10 +16,12 @@ public static class DependencyInjection
         this IServiceCollection services,
         string connectionString,
         KafkaOptions kafka,
+        AuthOptions auth,
         OutboxOptions? outbox = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(kafka);
+        ArgumentNullException.ThrowIfNull(auth);
 
         outbox ??= new OutboxOptions();
         outbox.ConnectionString = connectionString;
@@ -26,6 +29,10 @@ public static class DependencyInjection
         services.AddSingleton<IClock>(SystemClock.Instance);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton(ClinicPolicy.Default);
+
+        services.AddSingleton(auth);
+        services.AddSingleton<ITokenService, TokenService>();
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         services.AddSingleton<DomainEventsToOutboxInterceptor>();
         services.AddDbContext<MedSlotDbContext>((sp, options) =>
@@ -39,6 +46,8 @@ public static class DependencyInjection
         services.AddScoped<IPatientRepository, PatientRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IWaitlistRepository, WaitlistRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         services.AddScoped<IdempotencyStore>();
         services.AddScoped<IIdempotencyStore>(sp => sp.GetRequiredService<IdempotencyStore>());

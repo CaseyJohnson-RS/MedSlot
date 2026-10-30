@@ -7,17 +7,19 @@ using MedSlot.Domain.Common;
 namespace MedSlot.Application.Appointments;
 
 // Команды над существующей записью: загрузить, вызвать доменный метод, сохранить.
-// Проверку, что врач отмечает только свои приёмы, добавит авторизация (фаза 7).
+// ActingDoctor — врач, выполняющий действие: он может менять только свои приёмы.
+// Администратор действует без врача (null) и может менять любые.
 
 /// <summary>Пациент отменяет свою запись.</summary>
 public sealed record CancelAppointmentByPatient(AppointmentId AppointmentId, PatientId PatientId) : ICommand<Unit>;
 
 /// <summary>Врач или администратор отменяет запись. Не считается нарушением пациента.</summary>
-public sealed record CancelAppointmentByClinic(AppointmentId AppointmentId, string ReasonCode) : ICommand<Unit>;
+public sealed record CancelAppointmentByClinic(AppointmentId AppointmentId, string ReasonCode, DoctorId? ActingDoctor = null)
+    : ICommand<Unit>;
 
-public sealed record CompleteAppointment(AppointmentId AppointmentId) : ICommand<Unit>;
+public sealed record CompleteAppointment(AppointmentId AppointmentId, DoctorId? ActingDoctor = null) : ICommand<Unit>;
 
-public sealed record MarkAppointmentNoShow(AppointmentId AppointmentId) : ICommand<Unit>;
+public sealed record MarkAppointmentNoShow(AppointmentId AppointmentId, DoctorId? ActingDoctor = null) : ICommand<Unit>;
 
 internal sealed class CancelAppointmentByPatientHandler(
     IAppointmentRepository appointments,
@@ -57,7 +59,7 @@ internal sealed class CancelAppointmentByClinicHandler(
 {
     public Task<Result<Unit>> Handle(CancelAppointmentByClinic command, CancellationToken cancellationToken) =>
         AppointmentChange.ApplyAsync(
-            appointments, unitOfWork, command.AppointmentId,
+            appointments, unitOfWork, command.AppointmentId, command.ActingDoctor,
             a => a.CancelByClinic(clock.GetCurrentInstant(), command.ReasonCode), cancellationToken);
 }
 
@@ -67,7 +69,7 @@ internal sealed class CompleteAppointmentHandler(
 {
     public Task<Result<Unit>> Handle(CompleteAppointment command, CancellationToken cancellationToken) =>
         AppointmentChange.ApplyAsync(
-            appointments, unitOfWork, command.AppointmentId,
+            appointments, unitOfWork, command.AppointmentId, command.ActingDoctor,
             a => a.Complete(clock.GetCurrentInstant()), cancellationToken);
 }
 
@@ -77,7 +79,7 @@ internal sealed class MarkAppointmentNoShowHandler(
 {
     public Task<Result<Unit>> Handle(MarkAppointmentNoShow command, CancellationToken cancellationToken) =>
         AppointmentChange.ApplyAsync(
-            appointments, unitOfWork, command.AppointmentId,
+            appointments, unitOfWork, command.AppointmentId, command.ActingDoctor,
             a => a.MarkNoShow(clock.GetCurrentInstant()), cancellationToken);
 }
 
@@ -87,11 +89,14 @@ internal static class AppointmentChange
         IAppointmentRepository appointments,
         IUnitOfWork unitOfWork,
         AppointmentId id,
+        DoctorId? actingDoctor,
         Func<Appointment, Result> change,
         CancellationToken cancellationToken)
     {
         var appointment = await appointments.GetByIdAsync(id, cancellationToken);
-        if (appointment is null)
+
+        // Чужой приём для врача неотличим от несуществующего.
+        if (appointment is null || (actingDoctor is { } doctor && appointment.DoctorId != doctor))
         {
             return ApplicationErrors.NotFound("appointment", id);
         }

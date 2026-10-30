@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using FluentValidation;
+using MedSlot.Api.Auth;
 using MedSlot.Api.Endpoints;
 using MedSlot.Api.Idempotency;
 using MedSlot.Api.OpenApi;
@@ -9,6 +10,7 @@ using MedSlot.Infrastructure;
 using MedSlot.Infrastructure.Idempotency;
 using MedSlot.Infrastructure.Outbox;
 using MedSlot.Infrastructure.Persistence;
+using MedSlot.Infrastructure.Security;
 using MedSlot.Infrastructure.Waitlist;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
@@ -24,6 +26,11 @@ var kafka = new KafkaOptions
         ?? throw new InvalidOperationException("Не задан адрес Kafka: Kafka:BootstrapServers."),
 };
 var outbox = new OutboxOptions { RelayEnabled = builder.Configuration.GetValue("Outbox:RelayEnabled", true) };
+var auth = new AuthOptions
+{
+    SigningKey = builder.Configuration["Auth:SigningKey"]
+        ?? throw new InvalidOperationException("Не задан ключ подписи токенов: Auth:SigningKey."),
+};
 
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -32,8 +39,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
 builder.Services.AddMedSlotRateLimiting(builder.Configuration);
+builder.Services.AddMedSlotAuth();
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(connectionString, kafka, outbox);
+builder.Services.AddInfrastructure(connectionString, kafka, auth, outbox);
 builder.Services.AddHostedService<IdempotencyCleanupService>();
 if (builder.Configuration.GetValue("Waitlist:ExpiryEnabled", true))
 {
@@ -50,6 +58,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseRateLimiter();
 app.UseMiddleware<IdempotencyMiddleware>();
 
@@ -61,9 +71,12 @@ app.MapScalarApiReference();
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
+app.MapAuthEndpoints();
 app.MapAppointmentEndpoints();
 app.MapSchedulingEndpoints();
 app.MapWaitlistEndpoints();
+app.MapPatientEndpoints();
+app.MapAdminEndpoints();
 
 await app.RunAsync();
 

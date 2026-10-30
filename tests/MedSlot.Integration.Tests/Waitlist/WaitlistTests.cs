@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -253,30 +254,35 @@ public class WaitlistTests
     public async Task Waitlist_flow_over_http()
     {
         var json = new JsonSerializerOptions(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
-        using var client = _fixture.Factory.CreateClient();
         var clinic = await _fixture.CreateClinicAsync(patients: 2);
+        using var booker = await ClientFor(clinic.Patients[0]);
+        using var waiter = await ClientFor(clinic.Patients[1]);
         var booked = (await Book(clinic, 0, Start)).Value;
 
-        var joined = await client.PostAsJsonAsync("/api/v1/waitlist", new JoinWaitlistRequest(
-            clinic.Patients[1].Value, clinic.Doctor.Value, clinic.Long30.Value, NextMonday.ToDateOnly(), NextMonday.PlusDays(4).ToDateOnly()), Ct);
+        var joined = await waiter.PostAsJsonAsync("/api/v1/waitlist", new JoinWaitlistRequest(
+            clinic.Doctor.Value, clinic.Long30.Value, NextMonday.ToDateOnly(), NextMonday.PlusDays(4).ToDateOnly()), Ct);
         joined.StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        (await client.PostAsJsonAsync($"/api/v1/appointments/{booked.Value}/cancel", new CancelByPatientRequest(clinic.Patients[0].Value), Ct))
-            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await booker.PostAsync($"/api/v1/appointments/{booked.Value}/cancel", null, Ct)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        var waitlist = await client.GetFromJsonAsync<List<WaitlistEntryResponse>>($"/api/v1/patients/{clinic.Patients[1].Value}/waitlist", json, Ct);
+        var waitlist = await waiter.GetFromJsonAsync<List<WaitlistEntryResponse>>("/api/v1/me/waitlist", json, Ct);
         var offer = waitlist!.ShouldHaveSingleItem().Offer.ShouldNotBeNull();
         offer.StartsAt.ShouldBe(Start.ToDateTimeOffset());
 
-        (await client.PostAsJsonAsync($"/api/v1/waitlist/offers/{offer.AppointmentId}/accept", new WaitlistActionRequest(clinic.Patients[1].Value), Ct))
-            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await waiter.PostAsync($"/api/v1/waitlist/offers/{offer.AppointmentId}/accept", null, Ct)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         // Чужое предложение — как несуществующее.
-        (await client.PostAsJsonAsync($"/api/v1/waitlist/offers/{offer.AppointmentId}/decline", new WaitlistActionRequest(clinic.Patients[0].Value), Ct))
-            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await booker.PostAsync($"/api/v1/waitlist/offers/{offer.AppointmentId}/decline", null, Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
-        var appointment = await client.GetFromJsonAsync<AppointmentResponse>($"/api/v1/appointments/{offer.AppointmentId}", json, Ct);
+        var appointment = await waiter.GetFromJsonAsync<AppointmentResponse>($"/api/v1/appointments/{offer.AppointmentId}", json, Ct);
         appointment!.Status.ShouldBe(AppointmentStatus.Booked);
+    }
+
+    private async Task<HttpClient> ClientFor(PatientId patient)
+    {
+        var client = _fixture.Factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await _fixture.AccessTokenAsync(patient));
+        return client;
     }
 
     private static async Task<(Appointment, WaitlistEntry)> Load(AsyncServiceScope scope, AppointmentId offerId)

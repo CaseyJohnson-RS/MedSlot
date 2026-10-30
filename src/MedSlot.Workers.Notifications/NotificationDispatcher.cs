@@ -19,7 +19,10 @@ public sealed partial class NotificationDispatcher(
     IClock clock,
     ILogger<NotificationDispatcher> logger) : BackgroundService
 {
-    /// <summary>Отправляет пачку созревших уведомлений. Возвращает число отправленных.</summary>
+    /// <summary>
+    /// Обрабатывает пачку созревших уведомлений: отправляет, помечает неудачными или переносит повтор.
+    /// Возвращает число обработанных — по нему видно, пуста ли очередь (неудачи тоже считаются).
+    /// </summary>
     public async Task<int> DispatchDueAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -37,7 +40,6 @@ public sealed partial class NotificationDispatcher(
                 """)
             .ToListAsync(cancellationToken);
 
-        var sent = 0;
         foreach (var notification in due)
         {
             var recipient = await patients.FindAsync(notification.PatientId, cancellationToken);
@@ -53,7 +55,6 @@ public sealed partial class NotificationDispatcher(
                 await sender.SendAsync(NotificationTemplates.Render(notification, recipient, settings.ClinicTimeZone), recipient, cancellationToken);
                 notification.Status = NotificationStatus.Sent;
                 notification.SentAt = clock.GetCurrentInstant();
-                sent++;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -75,7 +76,7 @@ public sealed partial class NotificationDispatcher(
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return sent;
+        return due.Count;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

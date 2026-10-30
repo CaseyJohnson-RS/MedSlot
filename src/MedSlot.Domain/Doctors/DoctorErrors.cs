@@ -16,6 +16,11 @@ public static class DoctorErrors
     public static readonly DomainError ServiceNotProvided =
         new("doctor.service_not_provided", "Врач не оказывает эту услугу.");
 
+    public static DomainError ScheduleConflictsWithAppointments(int count) =>
+        new(
+            "doctor.schedule_conflicts_with_appointments",
+            $"Изменение расписания затрагивает активные записи ({count}). Сначала отмените их (отмена клиникой).");
+
     public static DomainError OverlappingWorkingHours(LocalTimeRange first, LocalTimeRange second) =>
         new("doctor.overlapping_working_hours", $"Рабочие интервалы пересекаются: {first} и {second}.");
 

@@ -112,6 +112,31 @@ public class DoctorTests
         doctor.WorkingHoursOn(Monday).Intervals.ShouldNotBeEmpty();
     }
 
+    [Theory]
+    [InlineData(9, 0, 30, true)]
+    [InlineData(12, 30, 30, true)] // встык с концом интервала
+    [InlineData(12, 45, 30, false)] // заходит на перерыв
+    [InlineData(13, 15, 15, false)] // в перерыве
+    [InlineData(14, 0, 60, true)]
+    public void Is_working_during(int hour, int minute, int minutes, bool expected)
+    {
+        var doctor = NewDoctor(Weekdays(Hours(9, 0, 13, 0), Hours(14, 0, 18, 0)));
+        var time = TimeRange.FromStart(Msk(Monday, hour, minute), Duration.FromMinutes(minutes));
+
+        doctor.IsWorkingDuring(time, Moscow).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Is_working_during_respects_overrides()
+    {
+        var doctor = NewDoctor(Weekdays(Hours(9, 0, 18, 0)));
+        var time = TimeRange.FromStart(Msk(Monday, 10), Duration.FromMinutes(30));
+
+        doctor.AddScheduleOverride(ScheduleOverride.DayOff(new DateInterval(Monday, Monday)));
+
+        doctor.IsWorkingDuring(time, Moscow).ShouldBeFalse();
+    }
+
     [Fact]
     public void Schedule_can_be_changed()
     {

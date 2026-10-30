@@ -11,9 +11,8 @@ namespace MedSlot.Api.Contracts;
 // работают с ними из коробки, а внутренние типы (NodaTime, строгие ID) не протекают наружу.
 // Моменты времени отдаются в UTC.
 
-public sealed record BookAppointmentRequest(Guid PatientId, Guid DoctorId, Guid ServiceId, DateTimeOffset StartsAt);
-
-public sealed record CancelByPatientRequest(Guid PatientId);
+/// <summary>Запись пациента: сам пациент берётся из токена.</summary>
+public sealed record BookAppointmentRequest(Guid DoctorId, Guid ServiceId, DateTimeOffset StartsAt);
 
 public sealed record CancelByClinicRequest(string ReasonCode);
 
