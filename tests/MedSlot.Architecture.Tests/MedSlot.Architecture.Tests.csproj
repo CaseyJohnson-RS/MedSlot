@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MedSlot.Api\MedSlot.Api.csproj" />
+    <ProjectReference Include="..\..\src\MedSlot.Application\MedSlot.Application.csproj" />
+    <ProjectReference Include="..\..\src\MedSlot.Domain\MedSlot.Domain.csproj" />
+    <ProjectReference Include="..\..\src\MedSlot.Infrastructure\MedSlot.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MedSlot.Workers.Analytics\MedSlot.Workers.Analytics.csproj" />
+    <ProjectReference Include="..\..\src\MedSlot.Workers.Audit\MedSlot.Workers.Audit.csproj" />
+    <ProjectReference Include="..\..\src\MedSlot.Workers.Notifications\MedSlot.Workers.Notifications.csproj" />
+  </ItemGroup>
+
+</Project>
