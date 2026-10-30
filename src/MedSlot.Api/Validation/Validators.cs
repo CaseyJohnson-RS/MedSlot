@@ -93,6 +93,24 @@ internal sealed class ScheduleOverrideRequestValidator : AbstractValidator<Sched
     }
 }
 
+internal sealed class WeeklyScheduleRequestValidator : AbstractValidator<WeeklyScheduleRequest>
+{
+    public WeeklyScheduleRequestValidator()
+    {
+        RuleFor(r => r.Days).NotNull();
+        RuleFor(r => r.Days)
+            .Must(days => days.Select(d => d.Day).Distinct().Count() == days.Count)
+            .When(r => r.Days is not null)
+            .WithMessage("Каждый день недели указывается не больше одного раза.");
+        RuleForEach(r => r.Days).ChildRules(day =>
+        {
+            day.RuleFor(d => d.Day).IsInEnum();
+            day.RuleFor(d => d.Hours).NotNull();
+            day.RuleForEach(d => d.Hours).Must(h => h.To > h.From).WithMessage("Конец интервала должен быть позже начала.");
+        });
+    }
+}
+
 internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitlistRequest>
 {
     // Не дальше горизонта записи (60 дней).

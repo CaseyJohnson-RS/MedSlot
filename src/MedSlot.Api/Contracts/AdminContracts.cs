@@ -13,6 +13,11 @@ public sealed record StaffCreatedResponse(Guid Id);
 
 public sealed record WorkingIntervalRequest(TimeOnly From, TimeOnly To);
 
+public sealed record WorkingDayRequest(DayOfWeek Day, IReadOnlyList<WorkingIntervalRequest> Hours);
+
+/// <summary>Недельное расписание целиком: дни, которых нет в списке, — нерабочие.</summary>
+public sealed record WeeklyScheduleRequest(IReadOnlyList<WorkingDayRequest> Days);
+
 /// <summary>Исключение из расписания на даты <c>From</c>–<c>To</c> (включительно, по календарю клиники).</summary>
 public sealed record ScheduleOverrideRequest(
     DateOnly From,

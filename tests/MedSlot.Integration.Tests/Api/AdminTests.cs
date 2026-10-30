@@ -159,4 +159,73 @@ public sealed class AdminTests : IDisposable
 
         (await _fixture.SendAsync(booking)).IsSuccess.ShouldBeTrue();
     }
+
+    private static WeeklyScheduleRequest Weekdays(params DayOfWeek[] days) => new(
+        days.Select(d => new WorkingDayRequest(d, [new WorkingIntervalRequest(new TimeOnly(10, 0), new TimeOnly(16, 0))])).ToList());
+
+    [Fact]
+    public async Task Weekly_schedule_is_replaced_entirely()
+    {
+        var clinic = await _fixture.CreateClinicAsync();
+
+        (await AsAdmin(HttpMethod.Put, $"/api/v1/admin/doctors/{clinic.Doctor.Value}/schedule",
+            Weekdays(DayOfWeek.Monday, DayOfWeek.Wednesday))).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var schedule = await _client.GetFromJsonAsync<DoctorScheduleResponse>($"/api/v1/doctors/{clinic.Doctor.Value}/schedule", Json, Ct);
+        schedule.ShouldNotBeNull().Weekly.Select(d => d.Day).ShouldBe([DayOfWeek.Monday, DayOfWeek.Wednesday], ignoreOrder: true);
+        schedule.Weekly.ShouldAllBe(d => d.Hours.Single() == new WorkingIntervalResponse(new TimeOnly(10, 0), new TimeOnly(16, 0)));
+    }
+
+    [Fact]
+    public async Task Weekly_schedule_change_over_upcoming_appointments_requires_cancelling_them_first()
+    {
+        var clinic = await _fixture.CreateClinicAsync();
+        var thursday = NextMonday.PlusDays(3);
+        var id = (await _fixture.SendAsync(new BookAppointment(
+            clinic.Patient, clinic.Doctor, clinic.Long30, Msk(thursday, 10), BookingSource.Patient))).Value;
+        var url = $"/api/v1/admin/doctors/{clinic.Doctor.Value}/schedule";
+        var withoutThursday = Weekdays(DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday);
+
+        var conflict = await AsAdmin(HttpMethod.Put, url, withoutThursday);
+        conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await ErrorCode(conflict)).ShouldBe("doctor.schedule_conflicts_with_appointments");
+
+        // Запись на 10:00 укладывается в новые часы четверга 10:00–16:00.
+        (await AsAdmin(HttpMethod.Put, url, Weekdays(DayOfWeek.Thursday))).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        (await _fixture.SendAsync(new CancelAppointmentByClinic(id, "schedule_change"))).IsSuccess.ShouldBeTrue();
+        (await AsAdmin(HttpMethod.Put, url, withoutThursday)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Past_appointments_do_not_block_weekly_schedule_change()
+    {
+        var clinic = await _fixture.CreateClinicAsync();
+        (await _fixture.SendAsync(new BookAppointment(
+            clinic.Patient, clinic.Doctor, clinic.Long30, Msk(NextMonday, 10), BookingSource.Patient))).IsSuccess.ShouldBeTrue();
+
+        _fixture.Clock.Reset(Msk(NextMonday, 12));
+        (await AsAdmin(HttpMethod.Put, $"/api/v1/admin/doctors/{clinic.Doctor.Value}/schedule", Weekdays(DayOfWeek.Friday)))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Invalid_weekly_schedule_is_rejected()
+    {
+        var clinic = await _fixture.CreateClinicAsync();
+        var url = $"/api/v1/admin/doctors/{clinic.Doctor.Value}/schedule";
+
+        var duplicateDay = await AsAdmin(HttpMethod.Put, url, Weekdays(DayOfWeek.Monday, DayOfWeek.Monday));
+        duplicateDay.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var overlapping = await AsAdmin(HttpMethod.Put, url, new WeeklyScheduleRequest(
+        [
+            new WorkingDayRequest(DayOfWeek.Monday,
+            [
+                new WorkingIntervalRequest(new TimeOnly(9, 0), new TimeOnly(13, 0)),
+                new WorkingIntervalRequest(new TimeOnly(12, 0), new TimeOnly(18, 0)),
+            ]),
+        ]));
+        (await ErrorCode(overlapping)).ShouldBe("doctor.overlapping_working_hours");
+    }
 }
