@@ -13,6 +13,9 @@ public static class ApplicationErrors
     public static DomainError NotFound(string entity, object id) =>
         new($"{entity}.not_found", $"Не найдено: {entity} {id}.");
 
+    public static readonly DomainError DateRangeReversed =
+        new("common.invalid_date_range", "Дата окончания не может быть раньше даты начала.");
+
     public static DomainError InvalidDateRange(int maxDays) =>
         new("common.invalid_date_range", $"Диапазон дат должен быть непустым и не длиннее {maxDays} дней.");
 }
