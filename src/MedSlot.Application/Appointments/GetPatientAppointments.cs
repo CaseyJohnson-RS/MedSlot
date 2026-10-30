@@ -7,12 +7,31 @@ namespace MedSlot.Application.Appointments;
 public sealed record AppointmentDto(
     AppointmentId Id,
     DoctorId DoctorId,
+    PatientId PatientId,
     ServiceId ServiceId,
     Instant StartsAt,
     Instant EndsAt,
-    AppointmentStatus Status);
+    AppointmentStatus Status)
+{
+    internal static AppointmentDto From(Appointment a) =>
+        new(a.Id, a.DoctorId, a.PatientId, a.ServiceId, a.Time.Start, a.Time.End, a.Status);
+}
+
+public sealed record GetAppointment(AppointmentId AppointmentId) : IQuery<AppointmentDto>;
 
 public sealed record GetPatientAppointments(PatientId PatientId) : IQuery<IReadOnlyList<AppointmentDto>>;
+
+internal sealed class GetAppointmentHandler(IAppointmentRepository appointments)
+    : IQueryHandler<GetAppointment, AppointmentDto>
+{
+    public async Task<Result<AppointmentDto>> Handle(GetAppointment query, CancellationToken cancellationToken)
+    {
+        var appointment = await appointments.GetByIdAsync(query.AppointmentId, cancellationToken);
+        return appointment is null
+            ? ApplicationErrors.NotFound("appointment", query.AppointmentId)
+            : AppointmentDto.From(appointment);
+    }
+}
 
 internal sealed class GetPatientAppointmentsHandler(IAppointmentRepository appointments)
     : IQueryHandler<GetPatientAppointments, IReadOnlyList<AppointmentDto>>
@@ -23,7 +42,7 @@ internal sealed class GetPatientAppointmentsHandler(IAppointmentRepository appoi
         var list = await appointments.GetByPatientAsync(query.PatientId, cancellationToken);
         return Result.Success<IReadOnlyList<AppointmentDto>>(list
             .OrderBy(a => a.Time.Start)
-            .Select(a => new AppointmentDto(a.Id, a.DoctorId, a.ServiceId, a.Time.Start, a.Time.End, a.Status))
+            .Select(AppointmentDto.From)
             .ToList());
     }
 }

@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using MedSlot.Application.Abstractions;
 using MedSlot.Domain.Appointments;
 using MedSlot.Domain.Common;
+using MedSlot.Infrastructure.Idempotency;
 using MedSlot.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -42,6 +43,15 @@ internal sealed class UnitOfWork(MedSlotDbContext db) : IUnitOfWork
             return postgres.ConstraintName == AppointmentConstraints.PatientNoOverlap
                 ? AppointmentErrors.PatientTimeConflict
                 : AppointmentErrors.SlotAlreadyTaken;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: IdempotencyKeyConfiguration.PrimaryKeyName,
+        })
+        {
+            // Параллельный запрос с тем же ключом идемпотентности успел сохранить его первым.
+            return ApplicationErrors.IdempotencyKeyInUse;
         }
     }
 

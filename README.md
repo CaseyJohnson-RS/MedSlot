@@ -88,6 +88,24 @@ docker compose up -d
 | PostgreSQL | `localhost:5432`, БД/пользователь/пароль `medslot` |
 | Kafka | `localhost:9092` |
 
+В режиме Development API сам применяет миграции и заполняет пустую БД демо-данными.
+
+### Попробовать API
+
+Демо-данные имеют фиксированные id:
+
+| Что | id |
+|---|---|
+| Терапевт | `0199c0de-0000-7000-8000-000000000101` |
+| Первичный приём, 30 мин | `0199c0de-0000-7000-8000-000000000001` |
+| Пациент Алиса | `0199c0de-0000-7000-8000-000000000201` |
+
+1. `GET /api/v1/doctors/{doctorId}/slots?serviceId=…&from=…&to=…` — свободные слоты.
+2. `POST /api/v1/appointments` с заголовком `Idempotency-Key` — запись. Повтор с тем же ключом вернёт тот же ответ.
+3. `POST /api/v1/appointments/{id}/cancel` — отмена.
+
+Ошибки приходят в формате `ProblemDetails` с машиночитаемым кодом в поле `code`, например `appointment.slot_already_taken`.
+
 Только инфраструктура, API — из IDE или `dotnet run --project src/MedSlot.Api`:
 
 ```bash

@@ -1,5 +1,6 @@
 using MedSlot.Application.Abstractions;
 using MedSlot.Domain.Clinic;
+using MedSlot.Infrastructure.Idempotency;
 using MedSlot.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,9 @@ public static class DependencyInjection
         services.AddScoped<IServiceRepository, ServiceRepository>();
         services.AddScoped<IPatientRepository, PatientRepository>();
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+
+        services.AddScoped<IdempotencyStore>();
+        services.AddScoped<IIdempotencyStore>(sp => sp.GetRequiredService<IdempotencyStore>());
 
         services.AddHealthChecks().AddDbContextCheck<MedSlotDbContext>("postgres", tags: ["ready"]);
 
