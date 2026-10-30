@@ -13,7 +13,6 @@ namespace MedSlot.Workers.Notifications;
 /// </summary>
 public sealed partial class NotificationDispatcher(
     IServiceScopeFactory scopeFactory,
-    IPatientDirectory patients,
     INotificationSender sender,
     NotificationsSettings settings,
     IClock clock,
@@ -27,6 +26,9 @@ public sealed partial class NotificationDispatcher(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+
+        // HTTP-клиент к API клиники — из scope: синглтон держал бы один HttpClient вечно.
+        var patients = scope.ServiceProvider.GetRequiredService<IPatientDirectory>();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var now = clock.GetCurrentInstant();
@@ -42,16 +44,17 @@ public sealed partial class NotificationDispatcher(
 
         foreach (var notification in due)
         {
-            var recipient = await patients.FindAsync(notification.PatientId, cancellationToken);
-            if (recipient is null)
-            {
-                notification.Status = NotificationStatus.Failed;
-                notification.LastError = "patient_not_found";
-                continue;
-            }
-
             try
             {
+                // Недоступный API клиники — такая же временная неудача, как недоступный SMTP: повтор позже.
+                var recipient = await patients.FindAsync(notification.PatientId, cancellationToken);
+                if (recipient is null)
+                {
+                    notification.Status = NotificationStatus.Failed;
+                    notification.LastError = "patient_not_found";
+                    continue;
+                }
+
                 await sender.SendAsync(NotificationTemplates.Render(notification, recipient, settings.ClinicTimeZone), recipient, cancellationToken);
                 notification.Status = NotificationStatus.Sent;
                 notification.SentAt = clock.GetCurrentInstant();

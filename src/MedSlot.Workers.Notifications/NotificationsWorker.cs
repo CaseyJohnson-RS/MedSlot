@@ -2,7 +2,6 @@ using MedSlot.Workers.Common;
 using MedSlot.Workers.Common.Consuming;
 using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
-using Npgsql;
 
 namespace MedSlot.Workers.Notifications;
 
@@ -10,8 +9,11 @@ public sealed class NotificationsSettings
 {
     public required string ConnectionString { get; init; }
 
-    /// <summary>Основная БД — только для чтения контактов пациента.</summary>
-    public required string ClinicConnectionString { get; init; }
+    /// <summary>Адрес API клиники: контакты пациента берутся из его внутреннего эндпоинта (ADR 0012).</summary>
+    public required Uri ClinicApiBaseUrl { get; init; }
+
+    /// <summary>Ключ сервиса уведомлений для внутреннего API.</summary>
+    public required string ClinicApiServiceKey { get; init; }
 
     public DateTimeZone ClinicTimeZone { get; init; } = DateTimeZoneProviders.Tzdb["Europe/Moscow"];
 
@@ -44,8 +46,12 @@ public static class NotificationsWorker
         StartFromEarliest = false,
     };
 
+    /// <param name="configureClinicApi">Доп. настройка HTTP-клиента к API клиники (в тестах — обработчик тестового сервера).</param>
     public static IServiceCollection AddNotificationsWorker(
-        this IServiceCollection services, NotificationsSettings settings, ConsumerOptions consumer)
+        this IServiceCollection services,
+        NotificationsSettings settings,
+        ConsumerOptions consumer,
+        Action<IHttpClientBuilder>? configureClinicApi = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -53,8 +59,14 @@ public static class NotificationsWorker
         services.AddScoped<IIntegrationEventProcessor, NotificationsProcessor>();
 
         services.AddSingleton(settings);
-        services.AddSingleton(NpgsqlDataSource.Create(settings.ClinicConnectionString));
-        services.AddSingleton<IPatientDirectory, ClinicPatientDirectory>();
+        var clinicApi = services.AddHttpClient<IPatientDirectory, ApiPatientDirectory>(client =>
+        {
+            client.BaseAddress = settings.ClinicApiBaseUrl;
+            client.DefaultRequestHeaders.Add(ApiPatientDirectory.ServiceKeyHeader, settings.ClinicApiServiceKey);
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+        configureClinicApi?.Invoke(clinicApi);
+
         services.AddSingleton<INotificationSender, SmtpOrLogNotificationSender>();
         services.AddSingleton<NotificationDispatcher>();
         services.AddHostedService(sp => sp.GetRequiredService<NotificationDispatcher>());

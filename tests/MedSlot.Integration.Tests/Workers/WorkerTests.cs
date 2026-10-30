@@ -41,13 +41,16 @@ public sealed class WorkerTests(DatabaseFixture fixture) : IAsyncLifetime
             new NotificationsSettings
             {
                 ConnectionString = fixture.DatabaseConnectionString("medslot_notifications_tests"),
-                ClinicConnectionString = fixture.ClinicConnectionString,
+                ClinicApiBaseUrl = new Uri("http://localhost/"),
+                ClinicApiServiceKey = DatabaseFixture.NotificationsServiceKey,
 
                 // Маленькая пачка: очередь в общей БД всегда больше неё, и обработка «до пустой очереди»
                 // проверяется в каждом прогоне, а не только при неудачном порядке тестов.
                 DispatchBatchSize = 5,
             },
-            Consumer(NotificationsWorker.ConsumerName, group)));
+            Consumer(NotificationsWorker.ConsumerName, group),
+            // Запросы к API клиники уходят в тестовый сервер в памяти, без сети.
+            clinicApi => clinicApi.ConfigurePrimaryHttpMessageHandler(() => fixture.Factory.Server.CreateHandler())));
         _audit = Build(services => services.AddAuditWorker(
             fixture.DatabaseConnectionString("medslot_audit_tests"),
             Consumer(AuditWorker.ConsumerName, group)));
