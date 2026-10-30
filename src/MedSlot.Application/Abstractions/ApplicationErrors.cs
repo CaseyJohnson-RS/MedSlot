@@ -7,6 +7,9 @@ public static class ApplicationErrors
     public static readonly DomainError ConcurrentModification =
         new("common.concurrent_modification", "Данные изменились параллельно. Обновите их и повторите действие.");
 
+    public static readonly DomainError IdempotencyKeyInUse =
+        new("idempotency.request_in_progress", "Запрос с этим ключом идемпотентности уже выполняется.");
+
     public static DomainError NotFound(string entity, object id) =>
         new($"{entity}.not_found", $"Не найдено: {entity} {id}.");
 

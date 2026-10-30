@@ -126,6 +126,10 @@ public sealed class DatabaseFixture : IAsyncLifetime
             // Не Development: миграции применяет фикстура, демо-данные не нужны.
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:Postgres", connectionString);
+
+            // Все запросы тестов идут с одного «адреса»: лимит не должен им мешать.
+            // Сам лимит проверяется на производной фабрике с низким порогом.
+            builder.UseSetting("RateLimiting:BookingPermitLimit", "100000");
             builder.ConfigureTestServices(services => services.AddSingleton(clock));
         }
     }
