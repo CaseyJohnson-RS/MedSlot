@@ -95,17 +95,26 @@ docker compose up -d
 
 ### Попробовать API
 
+Демо-учётные записи (пароль у всех `Demo-2026!`, только для локального стенда):
+
+| Роль | Логин |
+|---|---|
+| Администратор | `admin@medslot.local` |
+| Врачи | `ivanova@medslot.local` (терапевт), `petrov@medslot.local`, `smirnova@medslot.local` |
+| Пациенты | `alice@example.com` (уведомления письмом), `bob@example.com` (SMS-заглушка) |
+
 Демо-данные имеют фиксированные id:
 
 | Что | id |
 |---|---|
 | Терапевт | `0199c0de-0000-7000-8000-000000000101` |
 | Первичный приём, 30 мин | `0199c0de-0000-7000-8000-000000000001` |
-| Пациент Алиса | `0199c0de-0000-7000-8000-000000000201` |
 
-1. `GET /api/v1/doctors/{doctorId}/slots?serviceId=…&from=…&to=…` — свободные слоты.
-2. `POST /api/v1/appointments` с заголовком `Idempotency-Key` — запись. Повтор с тем же ключом вернёт тот же ответ.
-3. `POST /api/v1/appointments/{id}/cancel` — отмена.
+1. `POST /api/v1/auth/login` — вход; `accessToken` из ответа передаётся в заголовке `Authorization: Bearer …` (в Scalar — кнопка Authentication).
+2. `GET /api/v1/doctors/{doctorId}/slots?serviceId=…&from=…&to=…` — свободные слоты (без входа).
+3. `POST /api/v1/appointments` с заголовком `Idempotency-Key` — запись. Повтор с тем же ключом вернёт тот же ответ.
+4. `GET /api/v1/me/appointments` — свои записи; `POST /api/v1/appointments/{id}/cancel` — отмена.
+5. `POST /api/v1/auth/refresh` — новая пара токенов; refresh-токен одноразовый.
 
 Ошибки приходят в формате `ProblemDetails` с машиночитаемым кодом в поле `code`, например `appointment.slot_already_taken`.
 
