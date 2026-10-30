@@ -149,6 +149,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
             // Все запросы тестов идут с одного «адреса»: лимит не должен им мешать.
             // Сам лимит проверяется на производной фабрике с низким порогом.
             builder.UseSetting("RateLimiting:BookingPermitLimit", "100000");
+            builder.UseSetting("RateLimiting:AuthPermitLimit", "100000");
             builder.ConfigureTestServices(services => services.AddSingleton(clock));
         }
     }

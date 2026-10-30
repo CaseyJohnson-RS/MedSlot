@@ -23,6 +23,12 @@ internal static class ProblemResults
 
         "patient.booking_banned" => StatusCodes.Status403Forbidden,
 
+        "auth.invalid_credentials"
+            or "auth.invalid_refresh_token"
+            or "auth.refresh_token_reused" => StatusCodes.Status401Unauthorized,
+
+        "auth.email_taken" or "auth.doctor_has_account" => StatusCodes.Status409Conflict,
+
         // Конфликт с текущим состоянием: повтор после обновления данных может пройти.
         "appointment.slot_already_taken"
             or "appointment.patient_time_conflict"

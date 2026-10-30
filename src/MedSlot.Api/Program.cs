@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using FluentValidation;
+using MedSlot.Api.Auth;
 using MedSlot.Api.Endpoints;
 using MedSlot.Api.Idempotency;
 using MedSlot.Api.OpenApi;
@@ -38,6 +39,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
 builder.Services.AddMedSlotRateLimiting(builder.Configuration);
+builder.Services.AddMedSlotAuth();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, kafka, auth, outbox);
 builder.Services.AddHostedService<IdempotencyCleanupService>();
@@ -56,6 +58,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseRateLimiter();
 app.UseMiddleware<IdempotencyMiddleware>();
 
@@ -67,6 +71,7 @@ app.MapScalarApiReference();
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
+app.MapAuthEndpoints();
 app.MapAppointmentEndpoints();
 app.MapSchedulingEndpoints();
 app.MapWaitlistEndpoints();

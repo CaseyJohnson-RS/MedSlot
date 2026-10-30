@@ -32,6 +32,36 @@ internal sealed class CancelByClinicRequestValidator : AbstractValidator<CancelB
             .WithMessage("Код причины: латиница в нижнем регистре, цифры и подчёркивания, например doctor_sick.");
 }
 
+internal sealed class RegisterRequestValidator : AbstractValidator<RegisterRequest>
+{
+    public RegisterRequestValidator()
+    {
+        RuleFor(r => r.FullName).NotEmpty().MaximumLength(200);
+        RuleFor(r => r.Phone).NotEmpty();
+        RuleFor(r => r.Email).NotEmpty().MaximumLength(254);
+        RuleFor(r => r.Password)
+            .NotEmpty()
+            .MinimumLength(8)
+            .MaximumLength(128)
+            .Must(p => p.Any(char.IsLetter) && p.Any(char.IsDigit))
+            .WithMessage("Пароль: не короче 8 символов, хотя бы одна буква и одна цифра.");
+    }
+}
+
+internal sealed class LoginRequestValidator : AbstractValidator<LoginRequest>
+{
+    public LoginRequestValidator()
+    {
+        RuleFor(r => r.Email).NotEmpty();
+        RuleFor(r => r.Password).NotEmpty();
+    }
+}
+
+internal sealed class RefreshRequestValidator : AbstractValidator<RefreshRequest>
+{
+    public RefreshRequestValidator() => RuleFor(r => r.RefreshToken).NotEmpty().MaximumLength(100);
+}
+
 internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitlistRequest>
 {
     // Не дальше горизонта записи (60 дней).
