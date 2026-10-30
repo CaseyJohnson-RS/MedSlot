@@ -29,6 +29,10 @@ internal static class ProblemResults
 
         "auth.email_taken" or "auth.doctor_has_account" => StatusCodes.Status409Conflict,
 
+        "doctor.schedule_override_not_found" => StatusCodes.Status404NotFound,
+
+        "doctor.schedule_conflicts_with_appointments" or "doctor.overlapping_schedule_override" => StatusCodes.Status409Conflict,
+
         // Конфликт с текущим состоянием: повтор после обновления данных может пройти.
         "appointment.slot_already_taken"
             or "appointment.patient_time_conflict"

@@ -76,6 +76,7 @@ app.MapAppointmentEndpoints();
 app.MapSchedulingEndpoints();
 app.MapWaitlistEndpoints();
 app.MapPatientEndpoints();
+app.MapAdminEndpoints();
 
 await app.RunAsync();
 

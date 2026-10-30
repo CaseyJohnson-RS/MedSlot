@@ -56,6 +56,43 @@ internal sealed class RefreshRequestValidator : AbstractValidator<RefreshRequest
     public RefreshRequestValidator() => RuleFor(r => r.RefreshToken).NotEmpty().MaximumLength(100);
 }
 
+internal sealed class AdminBookAppointmentRequestValidator : AbstractValidator<AdminBookAppointmentRequest>
+{
+    public AdminBookAppointmentRequestValidator()
+    {
+        RuleFor(r => r.PatientId).NotEmpty();
+        RuleFor(r => r.DoctorId).NotEmpty();
+        RuleFor(r => r.ServiceId).NotEmpty();
+        RuleFor(r => r.StartsAt).NotEmpty();
+    }
+}
+
+internal sealed class CreateStaffRequestValidator : AbstractValidator<CreateStaffRequest>
+{
+    public CreateStaffRequestValidator()
+    {
+        RuleFor(r => r.Email).NotEmpty().MaximumLength(254);
+        RuleFor(r => r.Password)
+            .NotEmpty()
+            .MinimumLength(12)
+            .MaximumLength(128)
+            .Must(p => p.Any(char.IsLetter) && p.Any(char.IsDigit))
+            .WithMessage("Пароль сотрудника: не короче 12 символов, хотя бы одна буква и одна цифра.");
+        RuleFor(r => r.Role).IsInEnum();
+    }
+}
+
+internal sealed class ScheduleOverrideRequestValidator : AbstractValidator<ScheduleOverrideRequest>
+{
+    public ScheduleOverrideRequestValidator()
+    {
+        RuleFor(r => r.To).GreaterThanOrEqualTo(r => r.From).WithMessage("Дата окончания не может быть раньше даты начала.");
+        RuleFor(r => r.Kind).IsInEnum();
+        RuleForEach(r => r.Hours).Must(h => h.To > h.From).WithMessage("Конец интервала должен быть позже начала.");
+        RuleFor(r => r.Reason).MaximumLength(200);
+    }
+}
+
 internal sealed class JoinWaitlistRequestValidator : AbstractValidator<JoinWaitlistRequest>
 {
     // Не дальше горизонта записи (60 дней).
