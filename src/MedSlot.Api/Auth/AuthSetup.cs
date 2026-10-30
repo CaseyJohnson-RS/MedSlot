@@ -56,4 +56,8 @@ internal static class CurrentUser
         user.FindFirstValue(MedSlotClaims.DoctorId) is { } id ? new DoctorId(Guid.Parse(id)) : null;
 
     public static bool IsAdmin(this ClaimsPrincipal user) => user.IsInRole(Policies.Admin);
+
+    public static UserId UserId(this ClaimsPrincipal user) =>
+        new(Guid.Parse(user.FindFirstValue(MedSlotClaims.Subject)
+            ?? throw new InvalidOperationException("В токене нет sub: эндпоинт должен требовать аутентификацию.")));
 }

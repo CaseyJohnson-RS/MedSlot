@@ -44,7 +44,9 @@ internal static class ProblemResults
             or "common.concurrent_modification"
             or "idempotency.request_in_progress" => StatusCodes.Status409Conflict,
 
-        "common.invalid_date_range" or "idempotency.invalid_key" => StatusCodes.Status400BadRequest,
+        "common.invalid_date_range"
+            or "idempotency.invalid_key"
+            or "patient.card_access_purpose_required" => StatusCodes.Status400BadRequest,
 
         "rate_limit.exceeded" => StatusCodes.Status429TooManyRequests,
 
