@@ -17,6 +17,48 @@ services:
       kafka:
         condition: service_healthy
 
+  # Воркеры: у каждого своя база (создаётся при первом запуске) и своя группа консьюмеров.
+  notifications-worker:
+    build:
+      context: .
+      dockerfile: deploy/worker.Dockerfile
+      args:
+        WORKER: Notifications
+    environment:
+      ConnectionStrings__Notifications: Host=postgres;Port=5432;Database=medslot_notifications;Username=medslot;Password=medslot
+      # Только чтение контактов пациента (ADR 0010).
+      ConnectionStrings__Clinic: Host=postgres;Port=5432;Database=medslot;Username=medslot;Password=medslot
+      Kafka__BootstrapServers: kafka:29092
+      Smtp__Host: mailpit
+      Smtp__Port: 1025
+    depends_on:
+      api:
+        condition: service_started
+      mailpit:
+        condition: service_started
+    restart: unless-stopped
+
+  audit-worker:
+    build:
+      context: .
+      dockerfile: deploy/worker.Dockerfile
+      args:
+        WORKER: Audit
+    environment:
+      ConnectionStrings__Audit: Host=postgres;Port=5432;Database=medslot_audit;Username=medslot;Password=medslot
+      Kafka__BootstrapServers: kafka:29092
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  # Почтовый сервер для разработки: письма не уходят наружу, видны в веб-интерфейсе.
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
   postgres:
     image: postgres:18.6-alpine
     environment:

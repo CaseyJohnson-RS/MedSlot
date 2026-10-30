@@ -1,11 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MedSlot.Infrastructure\MedSlot.Infrastructure.csproj" />
+    <ProjectReference Include="..\MedSlot.Workers.Common\MedSlot.Workers.Common.csproj" />
   </ItemGroup>
 
 </Project>

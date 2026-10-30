@@ -33,9 +33,10 @@ src/
   MedSlot.Contracts        # интеграционные события (конверт и схемы), без зависимостей
   MedSlot.Domain           # агрегаты, инварианты, доменные события
   MedSlot.Infrastructure   # EF Core, Outbox, Kafka producer
-  MedSlot.Workers.Notifications
-  MedSlot.Workers.Analytics
-  MedSlot.Workers.Audit
+  MedSlot.Workers.Common         # цикл консьюмера, inbox, DLT
+  MedSlot.Workers.Notifications  # уведомления: подтверждение, напоминание, отмена
+  MedSlot.Workers.Audit          # append-only журнал всех событий
+  MedSlot.Workers.Analytics      # заготовка (фаза 9)
 tests/
   MedSlot.Domain.Tests
   MedSlot.Integration.Tests   # Testcontainers
@@ -86,6 +87,7 @@ docker compose up -d
 |---|---|
 | API (Scalar) | http://localhost:8080/scalar |
 | Kafka UI | http://localhost:8081 |
+| Mailpit (письма уведомлений) | http://localhost:8025 |
 | PostgreSQL | `localhost:5432`, БД/пользователь/пароль `medslot` |
 | Kafka | `localhost:9092` |
 

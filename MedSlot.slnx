@@ -7,6 +7,7 @@
     <Project Path="src/MedSlot.Infrastructure/MedSlot.Infrastructure.csproj" />
     <Project Path="src/MedSlot.Workers.Analytics/MedSlot.Workers.Analytics.csproj" />
     <Project Path="src/MedSlot.Workers.Audit/MedSlot.Workers.Audit.csproj" />
+    <Project Path="src/MedSlot.Workers.Common/MedSlot.Workers.Common.csproj" />
     <Project Path="src/MedSlot.Workers.Notifications/MedSlot.Workers.Notifications.csproj" />
   </Folder>
   <Folder Name="/tests/">
