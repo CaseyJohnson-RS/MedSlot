@@ -17,13 +17,20 @@ internal static class Policies
 
     /// <summary>Врач или администратор.</summary>
     public const string Staff = "Staff";
+
+    /// <summary>Внутренний сервис с ключом <c>X-Service-Key</c>; JWT пользователей сюда не подходят.</summary>
+    public const string Service = "Service";
 }
 
 internal static class AuthSetup
 {
-    public static IServiceCollection AddMedSlotAuth(this IServiceCollection services)
+    public static IServiceCollection AddMedSlotAuth(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer()
+            .AddScheme<ServiceKeyOptions, ServiceKeyAuthenticationHandler>(
+                ServiceKeyAuthenticationHandler.SchemeName,
+                options => configuration.GetSection("Internal:ServiceKeys").Bind(options.Keys));
 
         // Параметры проверки берутся из DI: тот же ключ, что у выпуска токенов, и те же часы приложения.
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
@@ -38,7 +45,10 @@ internal static class AuthSetup
             .AddPolicy(Policies.Patient, p => p.RequireRole(Policies.Patient))
             .AddPolicy(Policies.Doctor, p => p.RequireRole(Policies.Doctor))
             .AddPolicy(Policies.Admin, p => p.RequireRole(Policies.Admin))
-            .AddPolicy(Policies.Staff, p => p.RequireRole(Policies.Doctor, Policies.Admin));
+            .AddPolicy(Policies.Staff, p => p.RequireRole(Policies.Doctor, Policies.Admin))
+            .AddPolicy(Policies.Service, p => p
+                .AddAuthenticationSchemes(ServiceKeyAuthenticationHandler.SchemeName)
+                .RequireRole(Policies.Service));
 
         return services;
     }

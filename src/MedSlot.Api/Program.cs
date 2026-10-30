@@ -39,7 +39,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
 builder.Services.AddMedSlotRateLimiting(builder.Configuration);
-builder.Services.AddMedSlotAuth();
+builder.Services.AddMedSlotAuth(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, kafka, auth, outbox);
 builder.Services.AddHostedService<IdempotencyCleanupService>();
@@ -77,6 +77,7 @@ app.MapSchedulingEndpoints();
 app.MapWaitlistEndpoints();
 app.MapPatientEndpoints();
 app.MapAdminEndpoints();
+app.MapInternalEndpoints();
 
 await app.RunAsync();
 

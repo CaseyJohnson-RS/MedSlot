@@ -31,6 +31,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
     /// <summary>Понедельник, 09:00 по Москве.</summary>
     public static readonly Instant BaseNow = Msk(new LocalDate(2026, 11, 2), 9);
 
+    /// <summary>Ключ воркера уведомлений для внутреннего API.</summary>
+    public const string NotificationsServiceKey = "test-notifications-service-key";
+
     /// <summary>Понедельник через неделю после <see cref="BaseNow"/>: в горизонте записи.</summary>
     public static readonly LocalDate NextMonday = new(2026, 11, 9);
 
@@ -181,6 +184,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
             // Сам лимит проверяется на производной фабрике с низким порогом.
             builder.UseSetting("RateLimiting:BookingPermitLimit", "100000");
             builder.UseSetting("RateLimiting:AuthPermitLimit", "100000");
+            builder.UseSetting("Internal:ServiceKeys:notifications", NotificationsServiceKey);
             builder.ConfigureTestServices(services => services.AddSingleton(clock));
         }
     }
